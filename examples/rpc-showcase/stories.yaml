@@ -1,0 +1,74 @@
+- name: offer_discount
+  turns:
+    - rpc: { method: offer_discount }
+      response: |
+          Thank you for being joining our bot!
+          Please, provide your name to get special 50% discount code ↓
+    - message: John
+      response: "Great! Just use the discount code at checkout: XXXXX. Happy shopping!"
+- name: order_shipped_missing_delivered_days
+  turns:
+    - rpc:
+        method: order_shipped
+        params:
+          order_id: 123
+      response: "Your order #123 has been shipped."
+- name: order_shipped_full
+  turns:
+    - rpc:
+        method: order_shipped
+        params:
+          order_id: 123
+          delivered_days: 4
+      response: |
+        Your order #123 has been shipped.
+        It will be delivered within the next 4 days.
+- name: offer_discount_and_order_shipped
+  turns:
+    - rpc: { method: offer_discount }
+      response: |
+          Thank you for being joining our bot!
+          Please, provide your name to get special 50% discount code ↓
+    - rpc:
+        method: order_shipped
+        params:
+          order_id: 123
+      response: |
+        Your order #123 has been shipped.
+
+        Thank you for being joining our bot!
+        Please, provide your name to get special 50% discount code ↓
+    - message: John
+      response: "Great! Just use the discount code at checkout: XXXXX. Happy shopping!"
+- name: offer_discount_and_do_nothing
+  turns:
+    - rpc: { method: offer_discount }
+      response: |
+          Thank you for being joining our bot!
+          Please, provide your name to get special 50% discount code ↓
+    - rpc: { method: do_nothing }
+      response: ""
+    - message: John
+      response: "Great! Just use the discount code at checkout: XXXXX. Happy shopping!"
+- name: store_hours_and_order_shipped
+  turns:
+    - message: Are you open on weekends?
+      response: Are you visiting our store downtown or the one in the mall?
+    - rpc:
+        method: order_shipped
+        params:
+          order_id: 123
+      response: |
+        Your order #123 has been shipped.
+
+        Are you visiting our store downtown or the one in the mall?
+    - message: mall
+      response: Our retail store in the mall follows the mall operating hours of 9 AM to 9PM.
+- name: store_hours_and_do_nothing
+  turns:
+    - message: Are you open on weekends?
+      response: Are you visiting our store downtown or the one in the mall?
+    - rpc: { method: do_nothing }
+      response: ""
+    - message: mall
+      response: Our retail store in the mall follows the mall operating hours of 9 AM to 9PM.

@@ -1,0 +1,21 @@
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+intents:
+  - name: greetings
+    examples:
+      - Good morning
+      - Hello
+      - Hi
+  - name: ending
+    examples:
+      - Goodbye
+      - Bye
+      - See you
+dialog:
+  - condition: intents.greetings
+    response: |
+      Good day to you!
+  - condition: intents.ending
+    response: |
+      OK. See you later.

@@ -1,0 +1,16 @@
+- name: step-by-step
+  turns:
+    - message: i want to make a reservation
+      response: What day would you like to come in?
+      # we explicitly specify the full date to get consistent test
+    - message: May 29, 2022
+      response: What time do you want the reservation to be made for?
+    - message: at 5pm
+      response: How many people will be dining?
+    - message: "6"
+      response: OK. I am making you a reservation for 6 on 2022-05-29 at 17:00:00.
+
+- name: all-in-one
+  turns:
+    - message: Can 6 of us get a table for lunch on May 29, 2022 at 5pm?
+      response: OK. I am making you a reservation for 6 on 2022-05-29 at 17:00:00.

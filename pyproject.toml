@@ -1,0 +1,107 @@
+[tool.poetry]
+name = "Maxbot"
+version = "0.1.0"
+description = "Maxbot is an open source library and framework for creating conversational apps."
+license = "MIT"
+authors = ["Maxbot team <hello@maxbot.ai>"]
+maintainers = [
+    "Maxbot team <hello@maxbot.ai>"
+]
+readme = "README.md"
+homepage = "https://maxbot.ai"
+repository = "https://github.com/maxbot-ai/maxbot"
+documentation = "https://maxbot.ai/intro"
+keywords = [
+    "maxbot",
+    "conversational-apps",
+    "nlp",
+    "conversational-ai",
+    "bot",
+    "chatbot",
+    "text-bot",
+    "voice-bot",
+    "botkit",
+    "chatbot-framework"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Software Development :: Libraries",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux"
+]
+
+[tool.poetry.scripts]
+maxbot = "maxbot.cli:main"
+
+[tool.poetry.dependencies]
+python = ">=3.9, <3.10"
+PyYAML = "^6.0"
+Jinja2 = "^3.1"
+SQLAlchemy = ">=1.4.36, <3.0"
+marshmallow = "^3.19"
+click = "^8.1"
+spacy = "^3.5"
+dateparser = "^1.1"
+number-parser = "^0.3"
+textdistance = "^4.5"
+python-telegram-bot = {extras = ["ujson"], version = "^20.1"}
+viberbot = "^1.0"
+python-dotenv = "^1.0"
+rich = "^13.3"
+Babel = ">=2.9, <2.13"
+python-dateutil = "^2.8"
+pytz = "^2022.5"
+sanic = ">=21.12, <22.13"
+# sanic got deprecation warnings with 11
+websockets = ">=10, <11"
+httpx = "^0.23"
+markdown-it-py = "^2.1.0"
+defusedxml = "^0.7.1"
+MarkupSafe = "^2.1.2"
+regex= "<=2023.4.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2"
+black = "^22.3"
+pylint = "^2.13"
+isort = "^5.10"
+pre-commit = "^2.19"
+bandit = "^1.7"
+flake8 = "^4.0"
+flake8-docstrings = "^1.6"
+flake8-bugbear = "^22.9"
+flake8-eradicate = "^1.4"
+flake8-print = "^5.0"
+pep8-naming = "^0.13"
+pytest-cov = "^4.0"
+pytest-asyncio = "^0.20"
+sanic-testing = "^22.12"
+respx = "^0.20"
+freezegun = "^1.2.2"
+
+[tool.black]
+line-length = 99
+target-version = ["py39"]
+
+[tool.pylint.'MESSAGES CONTROL']
+profile = "black"
+disable = ["C0330", "C0114", "C0116"]
+max-line-length = 99
+
+[tool.isort]  # black config
+profile = "black"
+line_length = 99
+
+[tool.bandit]
+targets = ["maxbot",]
+exclude_dirs = ["tests", "examples"]
+skips = ["B101",]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

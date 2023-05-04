@@ -1,0 +1,143 @@
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+intents:
+  - name: greeting
+    examples:
+      - How are you?
+      - good afternoon
+      - good evening
+      - good morning
+      - good day
+      - Welcome
+      - greetings
+      - hey
+      - hello
+      - hi
+  - name: I_am_fine
+    examples:
+      - Good, thank you.
+      - I am well.
+      - I feel fine.
+      - I am fine.
+      - Fine.
+      - Well.
+  - name: restaurant_opening_hours
+    examples:
+      - When does the restaurant close?
+      - When is the restaurant open?
+      - What are the restaurant opening hours
+      - Restaurant openin hours
+      - What time do you close?
+      - When do you close?
+      - When do you open?
+      - At what time do you open?
+  - name: job_opportunities
+    examples:
+      - Do you have any job openings?
+      - Are you hiring?
+      - Are you looking for employees?
+      - Do you have any openings for chefs?
+      - Do you need any waiters?
+      - I am a hostess; do you have any open positions?
+      - I'm interested in a job
+      - I'd like to work for you.
+  - name: book_restaurant
+    examples:
+      - I want to book me a place in a restaurant
+      - Restaurant booking
+      - Book me a restaurant please
+      - I want to go to the restaurant
+  - name: cancel
+    examples:
+      - stop
+      - cancel
+      - end this
+      - stop playing
+      - please cancel
+      - end this please
+      - I want to end now
+      - I want you to stop this
+      - I do not want to do this
+entities:
+  - name: job_role
+    values:
+      - name: wait_staff
+        phrases:
+          - wait staff
+          - waiter
+      - name: greeter
+        phrases:
+          - greeter
+          - hostess
+      - name: chef
+        phrases:
+          - chef
+dialog:
+  - condition: intents.greeting
+    label: greeting
+    response: |
+      Hello. How are you?
+    followup:
+      - condition: intents.I_am_fine
+        response: |
+          Glad to hear that!
+      - condition: true
+        response: |
+          Hello! How can I help you?
+  - condition: intents.book_restaurant
+    label: book_restaurant
+    slot_filling:
+      - name: date
+        check_for: entities.date
+        prompt: |
+          When do you want to go?
+      - name: time
+        check_for: entities.time
+        prompt: |
+          What time do you want to go?
+      - name: guests
+        check_for: entities.number
+        prompt: |
+          How many people will be dining?
+    response: |
+      OK. I am making you a reservation.
+  - condition: intents.restaurant_opening_hours
+    response: |
+      The restaurant is open from 8am to 8pm.
+  - condition: intents.job_opportunities
+    label: job_opportunities
+    response: |
+      What kind of work are you interested in?
+    followup:
+      - condition: entities.job_role.wait_staff
+        response: |
+          We do need wait staff. Please send a resume to owner@example.com.
+          Thanks for your interest!
+      - condition: entities.job_role.greeter
+        response: |
+          Yes, we have openings! Please come to the restaurant Monday or
+          Wednesday for an in-person interview with the owner.
+      - condition: entities.job_role.chef
+        label: job_opportunities_for_chef
+        response: |
+          We have a fabulous cooking staff.
+          How many years of experience do you have?
+        settings:
+            after_digression_followup: never_return
+        followup:
+          - condition: entities.number and entities.number.value >= 10
+            response: |
+              We would love to meet you and talk about your interests.
+              Please call 888-123-4567 to schedule an interview.
+          - condition: entities.number and entities.number.value < 10
+            response: |
+              We do not hire anyone with less than 10 years of kitchen experience.
+  - condition: intents.cancel
+    response: |
+      Ok, cancelling the task.
+      <end />
+  - condition: true
+    label: everything_else
+    response: |
+      I didn't understand. You can try rephrasing.

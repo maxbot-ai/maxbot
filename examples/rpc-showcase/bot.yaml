@@ -1,0 +1,62 @@
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+intents:
+  - name: store_hours
+    examples:
+      - Are you open on weekends?
+      - What are your hours?
+      - What time do your doors open?
+      - When do you close?
+      - When do you open?
+entities:
+  - name: location
+    values:
+      - name: mall
+        phrases:
+          - mall
+      - name: downtown
+        phrases:
+          - downtown
+rpc:
+    # http http://127.0.0.1:5000/rpc/telegram/<YOUR_ID> method=offer_discount
+  - method: offer_discount
+    # http http://127.0.0.1:5000/rpc/telegram/<YOUR_ID> method=order_shipped params:='{"order_id": 123}'
+  - method: order_shipped
+    params:
+      - name: order_id
+        required: true
+      - name: delivered_days
+    # http http://127.0.0.1:5000/rpc/telegram/<YOUR_ID> method=do_nothing
+  - method: do_nothing
+dialog:
+  - condition: rpc.offer_discount
+    label: offer_discount
+    response: |
+      Thank you for being joining our bot!
+      Please, provide your name to get special 50% discount code ↓
+    followup:
+      - condition: message.text
+        # TODO: add [dissmis] button
+        response: |
+          Great! Just use the discount code at checkout: XXXXX. Happy shopping!
+  - condition: rpc.order_shipped
+    # TODO: add [dissmis] button
+    response: |
+      Your order #{{ params.order_id }} has been shipped.
+      {% if params.delivered_days %}
+      It will be delivered within the next {{ params.delivered_days }} days.
+      {% endif %}
+  - condition: intents.store_hours
+    label: store_hours
+    slot_filling:
+      - name: location
+        check_for: entities.location
+        prompt: |
+          Are you visiting our store downtown or the one in the mall?
+    response: |
+      {% if slots.location == 'downtown' %}
+        We are open from 8AM to 8PM seven days a week.
+      {% else %}
+        Our retail store in the mall follows the mall operating hours of 9 AM to 9PM.
+      {% endif %}

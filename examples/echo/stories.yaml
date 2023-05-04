@@ -1,0 +1,12 @@
+- name: echo
+  turns:
+    - message: hello
+      response: hello
+    - message: how are you?
+      response: how are you?
+    - message: lorem ipsum
+      response: lorem ipsum
+- name: image
+  turns:
+    - message: {"image": {"url": "http://127.0.0.1/file.jpeg"}}
+      response: <image url="http://127.0.0.1/file.jpeg" />

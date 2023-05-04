@@ -1,0 +1,127 @@
+extensions:
+  format: { locale: en }
+  datetime: {}
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+intents:
+  - name: "yes"
+    examples:
+      - "Yes"
+      - Sure
+      - I'd like that
+      - Please do.
+      - Yes please.
+      - Ok
+      - That sounds good.
+  - name: "no"
+    examples:
+      - "No"
+      - No thanks.
+      - Please don't.
+      - Please do not!
+      - That's not what I want at all
+      - Absolutely not.
+      - No way
+  - name: exit
+    examples:
+      - I want to stop
+      - Exit!
+      - Cancel this process
+      - I changed my mind. I don't want to make a reservation.
+      - Stop the reservation
+      - Wait, cancel this.
+      - Nevermind.
+  - name: reservation
+    examples:
+      - i'd like to make a reservation
+      - I want to reserve a table for dinner
+      - Can 3 of us get a table for lunch on May 29, 2022 at 5pm?
+      - do you have openings for next Wednesday at 7?
+      - Is there availability for 4 on Tuesday night?
+      - i'd like to come in for brunch tomorrow
+      - can i reserve a table?
+dialog:
+  - label: reservation
+    condition: intents.reservation
+    slot_filling:
+      - name: date
+        check_for: entities.date
+        prompt: |
+            What day would you like to come in?
+        found: |
+            {% if slots.date|date < now|date %}
+                You cannot make a reservation for a day in the past.
+                <prompt_again />
+            {% elif not entities.time and not entities.number %}
+                {{ slots.date|format_date("EEEE, MMMM d") }} it is.
+            {% endif %}
+      - name: time
+        check_for: entities.time
+        prompt: |
+            What time do you want the reservation to be made for?
+        found: |
+            {% if slots.time|time > "21:00:00"|time %}
+                Our last seating is at 9 PM.
+                <prompt_again />
+            {% elif slots.time|time < "09:00:00"|time %}
+                Our first seating is at 9 AM.
+                <prompt_again />
+            {% elif not entities.date and not entities.number %}
+                Ok, the reservation is for {{ slots.time|format_time("h:mm a") }}.
+            {% endif %}
+        not_found: |
+            {% if slots.counter|default(0) > 1 %}
+                {% set slots.time = '20:00' %}
+                You seem to be having trouble choosing a time.
+                I will make the reservation at 8PM for you.
+            {% else %}
+                {% set slots.counter = slots.counter|default(0) + 1 %}
+                Please specify the time that you want to eat.
+                The restaurant seats people between 9AM and 9PM.
+            {% endif %}
+      - name: guests
+        check_for: entities.number
+        prompt: |
+            How many people will be dining?
+        found: |
+            {% if slots.guests < 1 %}
+                Please specify a number that is larger than 0.
+
+                <prompt_again />
+            {% elif previous_value and previous_value != current_value %}
+                Ok, updating the number of guests from {{ previous_value }} to {{ current_value }}.
+            {% elif not entities.date and not entities.time %}
+                Ok. The reservation is for {{ slots.guests }} guests.
+            {% endif %}
+      - name: confirmation
+        check_for: slot_in_focus and (intents.yes or intents.no)
+        prompt: |
+            I'm going to reserve you a table for {{ slots.guests }} on
+            {{ slots.date|format_date("EEEE, MMMM d") }} at
+            {{ slots.time|format_time("h:mm a") }}. Should I go ahead?
+        found: |
+            {% if intents.no %}
+                Alright. Let's start over. I'll try to keep up this time.
+                {% delete slots.date %}
+                {% delete slots.time %}
+                {% delete slots.guests %}
+                {% delete slots.confirmation %}
+            {% endif %}
+        not_found: |
+          Respond with Yes to indicate that you want the reservation to be made
+          as-is, or No to indicate that you do not.
+    slot_handlers:
+      - condition: intents.exit
+        response: |
+            Ok, we'll stop there. No reservation will be made.
+            <response />
+    response: |
+        {% if slots.confirmation %}
+            OK. I am making you a reservation for {{ slots.guests }} on
+            {{ slots.date|format_date("EEEE, MMMM d") }} at
+            {{ slots.time|format_time("h:mm a") }}.
+        {% else %}
+            I look forward to helping you with your next reservation.
+            Have a good day.
+        {% endif %}

@@ -1,0 +1,59 @@
+- name: digressing away from slot filling then return back
+  turns:
+    - message: Book me a restaurant
+      response: When do you want to go?
+    - message: Tomorrow
+      response: What time do you want to go?
+    - message: What time do you close?
+      response: |
+        The restaurant is open from 8am to 8pm.
+
+        What time do you want to go?
+- name: digressing away from followup that allows return back
+  turns:
+    - message: Do you have any job openings?
+      response: What kind of work are you interested in?
+    - message: What are the restaurant opening hours
+      response: |
+        The restaurant is open from 8am to 8pm.
+
+        What kind of work are you interested in?
+- name: digression away from followup that never returns back
+  turns:
+    - message: Do you have any job openings?
+      response: What kind of work are you interested in?
+    - message: chef
+      response: We have a fabulous cooking staff. How many years of experience do you have?
+    - message: What are the restaurant opening hours
+      response: The restaurant is open from 8am to 8pm.
+    - message: I have more than 10 years of experience
+      response: I didn't understand. You can try rephrasing.
+- name: deny digressing from followup
+  turns:
+    - message: Hello
+      response: Hello. How are you?
+    - message: What are the restaurant opening hours
+      response: Hello! How can I help you?
+- name: digressing to a node that does not return
+  turns:
+    - message: Book me a restaurant
+      response: When do you want to go?
+    - message: Tomorrow
+      response: What time do you want to go?
+    - message: please cancel
+      response: Ok, cancelling the task.
+- name: digressing deep
+  turns:
+    - message: Do you have any job openings?
+      response: What kind of work are you interested in?
+    - message: Also book me a restaurant please
+      response: When do you want to go?
+    - message: The six of us will come tomorrow at 8pm
+      response: |
+        OK. I am making you a reservation.
+
+        What kind of work are you interested in?
+    - message: I am a hostess
+      response: |
+        Yes, we have openings! Please come to the restaurant Monday or
+        Wednesday for an in-person interview with the owner.

@@ -1,0 +1,197 @@
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+intents:
+  - name: about_restaurant
+    examples:
+      - Tell me about the restaurant
+      - i want to know about you
+      - who are the restaurant owners and what is their philosophy?
+      - What's your story?
+      - Where do you source your produce from?
+      - Who is your head chef and what is the chef's background?
+      - How many locations do you have?
+      - do you cater or host functions on site?
+      - Do you deliver?
+      - Are you open for breakfast?
+  - name: menu
+    examples:
+      - I want to see a menu
+      - What do you have for food?
+      - Are there any specials today?
+      - where can i find out about your cuisine?
+      - What dishes do you have?
+      - What are the choices for appetizers?
+      - do you serve desserts?
+      - What is the price range of your meals?
+      - How much does a typical dish cost?
+      - tell me the entree choices
+      - Do you offer a prix fixe option?
+  - name: cancel_order
+    examples:
+      - I want to cancel my cake order
+      - I need to cancel an order I just placed
+      - Can I cancel my cake order?
+      - I'd like to cancel my order
+      - There's been a change. I need to cancel my bakery order.
+      - please cancel the birthday cake order I placed last week
+      - The party theme changed; we don't need a cake anymore
+      - that order i placed, i need to cancel it.
+  - name: "yes"
+    examples:
+      - "Yes"
+      - Correct
+      - Please do.
+      - You've got it right.
+      - Please do that.
+      - that is correct.
+      - That's right
+      - yeah
+      - Yup
+      - Yes, I'd like to go ahead with that.
+  - name: about_you
+    examples:
+      - About you
+      - Describe yourself
+      - Do you have a name?
+      - Do you know who you are?
+      - How do I set you up?
+      - How do you work?
+      - How old are you?
+      - I want to set up a chatbot for my store
+      - Introduce yourself
+      - Let's talk about you
+      - Tell me about your life
+  - name: greetings
+    examples:
+      - Good morning
+      - Hello
+      - Hi
+entities:
+  - name: menu
+    values:
+      - name: standard
+        phrases:
+        - standard
+        - carte du jour
+        - cuisine
+      - name: vegetarian
+        phrases:
+        - vegetarian
+        - vegan
+        - plants-only
+      - name: cake
+        phrases:
+        - cake shop
+        - desserts
+        - bakery offerings
+  - name: order_number
+    values:
+      - name: order_syntax
+        regexps:
+          - '[A-Z]{2}\d{5}'
+dialog:
+  - condition: intents.about_restaurant
+    response: |
+        ![](https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg)
+
+        Truck Stop Gourmand is the brainchild of Gloria and Fred Smith.
+        What started out as a food truck in 2004 has expanded into a
+        thriving restaurant. We now have one brick-and-mortar restaurant
+        in downtown Portland. The bigger kitchen brought with it new chefs,
+        but each one is faithful to the philosophy that made the Smith food
+        truck so popular to begin with deliver fresh, local produce in
+        inventive and delicious ways.<br />
+        Join us for lunch or dinner seven days a week. Or order a cake from
+        our bakery.
+  - condition: intents.menu
+    label: menu
+    response: |
+        In keeping with our commitment to giving you only fresh local ingredients,
+        our menu changes daily to accommodate the produce we pick up in the morning.
+        You can find today's menu on our website.
+
+        Which menu do you want to see? [Standard] [Vegetarian] [Cake shop]
+    followup:
+      - condition: entities.menu.standard
+        response: |
+          To see our menu, go to the https://www.example.com/menu.html.
+      - condition: entities.menu.vegetarian
+        response: |
+          To see our vegetarian menu, go to the https://www.example.com/vegetarian-menu.html.
+      - condition: entities.menu.cake
+        response: |
+          To see our cake shop menu, go to the https://www.example.com/cake-menu.html.
+  - condition: intents.cancel_order
+    label: cancel_order
+    response: |
+        If the pickup time is more than 48 hours from now, you can cancel your order.
+        <followup />
+    followup:
+      - condition: entities.order_number
+        label: order_number_provided
+        response: |
+            {% set slots.order_number = entities.order_number.literal %}
+            Just to confirm, you want to cancel order {{ slots.order_number }}?
+        followup:
+          - condition: intents.yes
+            response: |
+                OK. The order {{ slots.order_number }} is canceled.
+                We hope we get the opportunity to bake a cake for you sometime soon.
+          - condition: true
+            response: |
+              <jump_to node="ask_order_number" transition="condition" />
+      - condition: true
+        label: ask_order_number
+        response: |
+          What is the order number?
+        followup:
+          - condition: entities.order_number
+            response: |
+                {% set order_number = entities.order_number.literal %}
+                OK. The order {{ order_number }} is canceled.
+                We hope we get the opportunity to bake a cake for you sometime soon.
+          - condition: message.text|map('int')|select|list|length > 0
+            label: clarify_order_number
+            response: |
+                The correct format for our order numbers is AAnnnnn.
+                The A's represents 2 uppercase letters, and the n's represent 5 numbers.
+
+                Do you have an order number in that format?
+            followup:
+              - condition: true
+                response: |
+                    {% if entities.order_number %}
+                        {% set order_number = entities.order_number.literal %}
+                        OK. The order {{ order_number }} is canceled.
+                        We hope we get the opportunity to bake a cake for you sometime soon.
+                    {% else %}
+                        I need the order number to cancel the order for you.
+
+                        If you don't know the order number, please call us
+                        at 958-234-3456 to cancel over the phone.
+                    {% endif %}
+          - condition: true
+            response: |
+                I need the order number to cancel the order for you.
+
+                If you don't know the order number, please call us at 958-234-3456 to cancel over the phone.
+  - condition: intents.about_you
+    label: about_you
+    response: |
+        I am a bot that is designed to answer your questions about the
+        Truck Stop Gourmand restaurant.
+
+        What should I call you?
+    followup:
+      - condition: message.text
+        response: |
+            {% set user.name = message.text %}
+            Hello, {{ user.name }}! It's lovely to meet you. How can I help you today?
+  - condition: intents.greetings
+    response: |
+        {% if user.name %}
+            Good day to you, {{ user.name }}!
+        {% else %}
+            Good day to you!
+        {% endif %}

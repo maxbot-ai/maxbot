@@ -1,0 +1,8 @@
+- name: hi-and-bye
+  turns:
+    - message: hello
+      response: Good day to you!
+    - message: how are you?
+      response: ""
+    - message: bye
+      response: OK. See you later.

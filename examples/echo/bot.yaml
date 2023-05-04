@@ -1,0 +1,10 @@
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+dialog:
+  - condition: message.text
+    response: |
+      {{ message.text }}
+  - condition: message.image
+    response: |
+       <image  url="{{ message.image.url }}" />

@@ -1,0 +1,32 @@
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+intents:
+  - name: reservation
+    examples:
+      - i'd like to make a reservation
+      - I want to reserve a table for dinner
+      - Can 3 of us get a table for lunch on May 29, 2022 at 5pm?
+      - do you have openings for next Wednesday at 7?
+      - Is there availability for 4 on Tuesday night?
+      - i'd like to come in for brunch tomorrow
+      - can i reserve a table?
+dialog:
+  - condition: intents.reservation
+    label: reservation
+    slot_filling:
+      - name: date
+        check_for: entities.date
+        prompt: |
+          What day would you like to come in?
+      - name: time
+        check_for: entities.time
+        prompt: |
+          What time do you want the reservation to be made for?
+      - name: guests
+        check_for: entities.number
+        prompt: |
+          How many people will be dining?
+    response: |
+      OK. I am making you a reservation for {{ slots.guests }}
+      on {{ slots.date }} at {{ slots.time }}.
