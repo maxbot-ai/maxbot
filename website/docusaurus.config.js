@@ -87,7 +87,7 @@ const config = {
         appId: 'HT7Q9JXWBE',
 
         // Public API key: it is safe to commit it
-        apiKey: 'Ycb48571c8173f9032d0c77a7998c6a49',
+        apiKey: 'cb48571c8173f9032d0c77a7998c6a49',
 
         indexName: 'maxbot',
 
