@@ -9,8 +9,8 @@ require('dotenv').config();
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Maxbot Open Source Conversational AI Framework',
-  tagline: 'Maxbot is an open source library and framework for creating conversational apps.',
+  title: 'Maxbot',
+  tagline: 'Open Source Conversational AI Framework',
   url: process.env.WEB_SITE_URL,
   baseUrl: '/',
   onBrokenLinks: 'warn',
@@ -66,7 +66,7 @@ const config = {
             label: 'Docs',
           },
           {
-            href: 'https://github.com/maxbot-ai',
+            href: 'https://github.com/maxbot-ai/maxbot',
             className: 'header-github-link',
             'aria-label': 'GitHub repository',
             position: 'right',
@@ -81,6 +81,29 @@ const config = {
         theme: lightCodeTheme,
         darkTheme: darkCodeTheme,
         additionalLanguages: ["django"],
+      },
+      algolia: {
+        // The application ID provided by Algolia
+        appId: 'HT7Q9JXWBE',
+
+        // Public API key: it is safe to commit it
+        apiKey: 'Ycb48571c8173f9032d0c77a7998c6a49',
+
+        indexName: 'maxbot',
+
+        // Optional: see doc section below
+        contextualSearch: true,
+
+        // Optional: Specify domains where the navigation should occur through window.location instead on history.push. Useful when our Algolia config crawls multiple documentation sites and we want to navigate with window.location.href to them.
+        externalUrlRegex: 'external\\.com|domain\\.com',
+
+        // Optional: Algolia search parameters
+        searchParameters: {},
+
+        // Optional: path for search page that enabled by default (`false` to disable it)
+        searchPagePath: 'search',
+
+        //... other Algolia params
       },
     }
     ),
