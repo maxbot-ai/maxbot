@@ -6,18 +6,16 @@
       response: What time do you want to go?
     - message: What time do you close?
       response: |
-        The restaurant is open from 8am to 8pm.
-
-        What time do you want to go?
+        <text>The restaurant is open from 8am to 8pm.</text>
+        <text>What time do you want to go?</text>
 - name: digressing away from followup that allows return back
   turns:
     - message: Do you have any job openings?
       response: What kind of work are you interested in?
     - message: What are the restaurant opening hours
       response: |
-        The restaurant is open from 8am to 8pm.
-
-        What kind of work are you interested in?
+        <text>The restaurant is open from 8am to 8pm.</text>
+        <text>What kind of work are you interested in?</text>
 - name: digression away from followup that never returns back
   turns:
     - message: Do you have any job openings?
@@ -50,9 +48,8 @@
       response: When do you want to go?
     - message: The six of us will come tomorrow at 8pm
       response: |
-        OK. I am making you a reservation.
-
-        What kind of work are you interested in?
+        <text>OK. I am making you a reservation.</text>
+        <text>What kind of work are you interested in?</text>
     - message: I am a hostess
       response: |
         Yes, we have openings! Please come to the restaurant Monday or

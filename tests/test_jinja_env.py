@@ -7,7 +7,6 @@ from jinja2.exceptions import TemplateRuntimeError, TemplateSyntaxError, Undefin
 
 from maxbot.context import EntitiesResult, RecognizedEntity
 from maxbot.jinja_env import StateNamespace, create_jinja_env
-from maxbot.markdown import _SPECIAL_SYMBOLS
 
 
 @pytest.fixture
@@ -41,6 +40,12 @@ def test_user_set(jinja_env):
     user = {}
     t.render(user=StateNamespace(user))
     assert user["xxx"] == "yyy"
+    assert repr(user) == repr({"xxx": "yyy"})
+
+
+def test_user_set_none(jinja_env):
+    with pytest.raises(ValueError):
+        jinja_env.from_string("{% set user.x = none %}").render(user=StateNamespace({}))
 
 
 def test_user_delete(jinja_env):
@@ -55,6 +60,11 @@ def test_user_delete_missing(jinja_env):
     user = {}
     t.render(user=StateNamespace(user))
     assert user == {}
+
+
+def test_delete_template_runtime_error(jinja_env):
+    with pytest.raises(TemplateRuntimeError) as excinfo:
+        jinja_env.from_string("{% delete user.xxx %}").render(user={})
 
 
 @pytest.mark.parametrize("level", ["debug", "warning"])
@@ -138,33 +148,6 @@ def test_nl2br(jinja_env, value, expected):
     assert res == expected
 
 
-def test_autoescape_markdown(jinja_env):
-    value = _SPECIAL_SYMBOLS
-    res = jinja_env.from_string("{{ value }}").render(value=value)
-    assert res == "".join(f"&#{ord(ch)};" for ch in value)
-
-
-def test_double_scape(jinja_env):
-    value = _SPECIAL_SYMBOLS
-    res = jinja_env.from_string("{{ value|escape|escape }}").render(value=value)
-    assert res == "".join(f"&#{ord(ch)};" for ch in value)
-
-
-def test_url_attr(jinja_env):
-    value = "https://api.telegram.org/file/botXXX:YYYYYYYY/photos/file_0.jpg"
-    res = jinja_env.from_string('<image url="{{ value }}" />').render(value=value)
-    assert res == (
-        '<image url="https&#58;&#47;&#47;api&#46;telegram&#46;org'
-        '&#47;file&#47;botXXX&#58;YYYYYYYY&#47;photos&#47;file&#95;0&#46;jpg" />'
-    )
-
-
-def test_xmlattr(jinja_env):
-    value = "https://api.telegram.org/file/botXXX:YYYYYYYY/photos/file_0.jpg"
-    res = jinja_env.from_string('<image{{ {"url": value}|xmlattr }} />').render(value=value)
-    assert res == '<image url="https://api.telegram.org/file/botXXX:YYYYYYYY/photos/file_0.jpg" />'
-
-
 def test_macro_maxml(jinja_env):
     res = jinja_env.from_string(
         (
@@ -175,3 +158,8 @@ def test_macro_maxml(jinja_env):
         )
     ).render()
     assert res == "<text>Hello, World</text>"
+
+
+def test_escape(jinja_env):
+    res = jinja_env.from_string('<foo bar="{{ val }}" />').render(val='"')
+    assert res == '<foo bar="&#34;" />'

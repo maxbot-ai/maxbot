@@ -564,7 +564,7 @@ Different kinds of dialog flows has their own sets of control commands which is 
 ## Templates
 
 The template mechanism is applied to all the lines that are set as replies in a bot.
-It means that any piece of a Markdown document can be generated dynamically based on the current data.
+It means that any piece of a [XML document](/design-guides/maxml.md) can be generated dynamically based on the current data.
 
 ### Expressions
 
@@ -613,7 +613,7 @@ For example, if the value of `user.var1` consists of one quote character (`"`), 
 <foo bar="&#34;" />
 ```
 
-And while reading a resulting markdown document, the parser will process the found HTML entity and write it with the next character of the value of the field `bar`.
+And while reading a resulting XML document, the parser will process the found HTML entity and write it with the next character of the value of the field `bar`.
 
 ### Statements
 
@@ -877,7 +877,7 @@ During the communication, the user may suddenly change the topic. The bot should
         - name: guests
           check_for: entities.number
           prompt: How many people will be dining?
-      response: !jinja >-
+      response: |
           OK. I am making you a reservation for
           {{ slots.guests }} on {{ slots.date }} at {{ slots.time }}.
   ```
@@ -914,12 +914,18 @@ intents:
 
 Where `datetime` is the name of the extension and value `{}` is the extension configuration dictionary. In our case configuration is empty. Generally, each extension has it's own configuration schema described in the extension's documentation. For example, an extension that provides filters to format numbers and dates could be configured as follows
 
-```
+```yaml
 extensions:
-  format: { locale: en }
+    babel: { locale: en }
 ```
 
 Refer to the extension's documentation for the specific features provided by this extension and its configuration.
+
+Maxbot contains the following built-in extensions:
+* [datetime](/extensions/datetime.md): provides template filters to convert input value to date/time.
+* [babel](/extensions/babel.md): [Babel library](https://babel.pocoo.org/) frontend.
+* [rasa](/extensions/rasa.md):  allows you to use an external Rasa Open Source Server as an NLU module for MaxBot.
+* [jinja\_loader](/extensions/jinja_loader.md): allows you to include jinja template files into your response.
 
 ## Resources
 

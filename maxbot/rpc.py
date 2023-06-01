@@ -1,7 +1,7 @@
 """MaxBot RPC."""
-from marshmallow import Schema, ValidationError, fields
 
 from .errors import BotError, YamlSnippet
+from .maxml import Schema, ValidationError, fields
 from .resources import InlineResources
 from .schemas import ResourceSchema
 

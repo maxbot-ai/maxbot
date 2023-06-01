@@ -1,8 +1,8 @@
+import datetime
 import logging
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from marshmallow import Schema, fields
 
 from maxbot.context import (
     EntitiesResult,
@@ -11,9 +11,11 @@ from maxbot.context import (
     RecognizedIntent,
     RpcRequest,
     StateVariables,
+    TurnContext,
 )
 from maxbot.dialog_manager import DialogManager
 from maxbot.errors import BotError
+from maxbot.maxml import Schema, fields
 from maxbot.resources import Resources
 from maxbot.schemas import CommandSchema, MessageSchema
 
@@ -208,9 +210,10 @@ async def test_journal_debug(dialog_stub, state_stub):
     await dm.process_message("hey bot", dialog_stub, state_stub)
     assert hook.called
     (ctx,) = hook.call_args.args
-    (record,) = ctx.logs
-    assert record.level == "DEBUG"
-    assert record.message == "hello world!"
+    assert {
+        "type": "log",
+        "payload": {"level": "DEBUG", "message": "hello world!"},
+    } in ctx.journal_events
 
 
 async def test_journal_error(dialog_stub, state_stub):
@@ -246,8 +249,10 @@ async def test_nlu_recognize(dialog_stub, state_stub):
         nlu=AsyncMock(
             return_value=(IntentsResult(), EntitiesResult()),
             load_resources=Mock(),  # mock the nlu.load method with is not async
-        )
+        ),
     )
+    utc_time = datetime.datetime.now(datetime.timezone.utc)
+    dm.utc_time_provider = lambda: utc_time
     dm.load_inline_resources(
         """
         dialog:
@@ -257,4 +262,4 @@ async def test_nlu_recognize(dialog_stub, state_stub):
     )
     (command,) = await dm.process_message("hey bot", dialog_stub, state_stub)
     assert command == {"text": "Hello world!"}
-    dm.nlu.assert_awaited_once_with({"text": "hey bot"})
+    dm.nlu.assert_awaited_once_with({"text": "hey bot"}, utc_time=utc_time)

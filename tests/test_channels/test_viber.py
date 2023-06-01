@@ -74,10 +74,9 @@ async def test_create_dialog(bot, dialog):
 async def test_send_text(bot, dialog, respx_mock):
     respx_mock.post(f"{API_URL}/send_message").respond(json={"status": 0, "message_token": "11"})
 
-    await bot.channels.viber.call_senders(
-        {"text": MESSAGE_TEXT},
-        dialog,
-    )
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.viber.call_senders({"text": text}, dialog)
 
     request = respx_mock.calls.last.request
     assert json.loads(request.content) == {
@@ -108,8 +107,10 @@ async def test_receive_unknown(bot):
 async def test_send_image(bot, dialog, respx_mock):
     respx_mock.post(f"{API_URL}/send_message").respond(json={"status": 0, "message_token": "11"})
 
+    caption = Mock()
+    caption.render = Mock(return_value=MESSAGE_TEXT)
     await bot.channels.viber.call_senders(
-        {"image": {"url": IMAGE_URL, "caption": MESSAGE_TEXT}}, dialog
+        {"image": {"url": IMAGE_URL, "caption": caption}}, dialog
     )
 
     request = respx_mock.calls.last.request
@@ -128,9 +129,11 @@ async def test_send_error(bot, dialog, respx_mock):
         json={"status": 1, "status_message": "error reason"}
     )
 
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
     with pytest.raises(RuntimeError, match="failed with status: 1, message: error reason"):
         await bot.channels.viber.call_senders(
-            {"text": MESSAGE_TEXT},
+            {"text": text},
             dialog,
         )
 
@@ -181,7 +184,9 @@ async def test_get_avatar_and_name(dialog, respx_mock):
     """
     )
     bot = builder.build()
-    await bot.channels.viber.call_senders({"text": MESSAGE_TEXT}, dialog)
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.viber.call_senders({"text": text}, dialog)
 
     request = respx_mock.calls.last.request
     assert json.loads(request.content) == {

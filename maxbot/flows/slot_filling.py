@@ -3,9 +3,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from marshmallow import Schema, fields, post_load
-
-from ..context import EntitiesProxy, RecognizedEntity
+from ..context import EntitiesProxy, RecognizedEntity, RecognizedIntent
+from ..maxml import Schema, fields, post_load
 from ..scenarios import ExpressionField, ScenarioField
 from ..schemas import MaxmlSchema, ResourceSchema
 from ._base import DigressionResult, FlowResult
@@ -230,6 +229,8 @@ class Turn:
             value = slot.value(self.ctx)
         if isinstance(value, (EntitiesProxy, RecognizedEntity)):
             value = value.value
+        if isinstance(value, RecognizedIntent):
+            value = True
         logger.debug("elicit slot %r value %r", slot.name, value)
         previous_value = self.ctx.state.slots.get(slot.name)
         self.ctx.state.slots[slot.name] = value
@@ -255,18 +256,23 @@ class Turn:
         :param Slot slot: A slot for which execute the scenario.
         :param dict params: Extra params to pass to the scenario.
         """
+        payload = self.ctx.journal_event("found", {"slot": slot.name})
         for command in await slot.found(self.ctx, **params):
             if "response" in command:
                 self.want_response = True
+                payload.update(control_command="response")
                 break
             if "prompt_again" in command:
+                payload.update(control_command="prompt_again")
                 self.clear_slot(slot)
                 break
             if "listen_again" in command:
+                payload.update(control_command="listen_again")
                 self.clear_slot(slot)
                 self.listen_again(slot)
                 break
             if "move_on" in command:
+                payload.update(control_command="move_on")
                 break
             self.ctx.commands.append(command)
 
@@ -275,14 +281,18 @@ class Turn:
 
         :param Slot slot: A slot for which execute the scenario.
         """
+        payload = self.ctx.journal_event("not_found", {"slot": slot.name})
         for command in await slot.not_found(self.ctx):
             if "response" in command:
                 self.want_response = True
+                payload.update(control_command="response")
                 break
             if "prompt_again" in command:
+                payload.update(control_command="prompt_again")
                 break
             if "listen_again" in command:
                 self.listen_again(slot)
+                payload.update(control_command="listen_again")
                 break
             self.ctx.commands.append(command)
         else:
@@ -293,12 +303,15 @@ class Turn:
 
         :param Slot slot: A slot for which execute the scenario.
         """
+        payload = self.ctx.journal_event("prompt", {"slot": slot.name})
         for command in await slot.prompt(self.ctx):
             if "response" in command:
                 self.want_response = True
+                payload.update(control_command="response")
                 break
             if "listen_again" in command:
                 self.listen_again(slot)
+                payload.update(control_command="listen_again")
                 break
             self.ctx.commands.append(command)
         else:
@@ -309,11 +322,14 @@ class Turn:
 
         :param Handler handler: A handler for which execute the scenario.
         """
+        payload = self.ctx.journal_event("slot_handler", {"condition": handler.condition.source})
         for command in await handler.response(self.ctx):
             if "response" in command:
                 self.want_response = True
+                payload.update(control_command="response")
                 break
             if "move_on" in command:
+                payload.update(control_command="move_on")
                 break
             self.ctx.commands.append(command)
 
@@ -327,6 +343,9 @@ class Turn:
             self.elicit(slot)
         # found
         for slot, params in self.found_slots:
+            self.ctx.journal_event(
+                "slot_filling", {"slot": slot.name, "value": params["current_value"]}
+            )
             if slot.found:
                 await self.found(slot, params)
         if self.state.get("slot_in_focus") and not self.found_slots:

@@ -21,7 +21,7 @@ class TextChannel(Channel):
         return None
 
     async def send_text(self, command: dict, dialog: dict):
-        self.sent.append(command["text"])
+        self.sent.append(command["text"].render())
 
 
 @pytest.fixture

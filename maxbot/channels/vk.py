@@ -5,9 +5,9 @@ from functools import cached_property
 from urllib.parse import urljoin
 
 import httpx
-from marshmallow import Schema, fields
 
 from .._download import download_to_tempfile
+from ..maxml import Schema, fields
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +202,7 @@ class VkChannel:
         :param dict command: a command with the payload :attr:`~maxbot.schemas.CommandSchema.text`.
         :param dict dialog: a dialog we respond in, with the schema :class:`~maxbot.schemas.DialogSchema`
         """
-        await self._api.send_text(dialog["user_id"], command["text"])
+        await self._api.send_text(dialog["user_id"], command["text"].render())
 
     async def send_image(self, command: dict, dialog: dict):
         """Send an image command to the channel.
@@ -221,7 +221,10 @@ class VkChannel:
                 download_result.response.headers["content-type"],
             )
             photo = await self._api.save_photo(server, photo, hash_param)
-            await self._api.send_image(dialog["user_id"], photo, command["image"].get("caption"))
+            caption = command["image"].get("caption")
+            await self._api.send_image(
+                dialog["user_id"], photo, None if caption is None else caption.render()
+            )
 
     async def receive_text(self, incoming_message: dict):
         """

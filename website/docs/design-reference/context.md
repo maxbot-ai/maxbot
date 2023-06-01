@@ -15,6 +15,7 @@ Attributes of this class are context and special variables.
 | `message`    | [MessageSchema](/design-reference/protocol.md#messageschema) | A message processed by the bot. |
 | `dialog`     | [DialogSchema](/design-reference/protocol.md#dialogschema)  | General information that does not change or rarely changes during a conversation. |
 | `rpc`        | [RpcContext](#rpccontext) | The context of the RPC request processed by the bot. |
+| `utc_time`   | [datetime](https://docs.python.org/3/library/datetime.html#datetime-objects) | Current UTC date and time. |
 
 Special variables related to the [digression](/design-guides/digressions.md) flow.
 

@@ -5,7 +5,8 @@ from functools import cached_property
 from urllib.parse import urljoin
 
 import httpx
-from marshmallow import Schema, fields
+
+from ..maxml import Schema, fields
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +163,7 @@ class FacebookChannel:
         :param dict command: a command with the payload :attr:`~maxbot.schemas.CommandSchema.text`.
         :param dict dialog: a dialog we respond in, with the schema :class:`~maxbot.schemas.DialogSchema`
         """
-        await self._api.send_text(dialog["user_id"], command["text"])
+        await self._api.send_text(dialog["user_id"], command["text"].render())
 
     async def send_image(self, command: dict, dialog: dict):
         """Send an image message to the channel.
@@ -174,7 +175,7 @@ class FacebookChannel:
         """
         caption = command["image"].get("caption")
         if caption:
-            await self._api.send_text(dialog["user_id"], caption)
+            await self._api.send_text(dialog["user_id"], caption.render())
         await self._api.send_image(dialog["user_id"], command["image"]["url"])
 
     async def receive_text(self, messaging: dict):

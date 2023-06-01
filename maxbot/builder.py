@@ -1,8 +1,6 @@
 """MaxBot creation."""
 from functools import cached_property, partial
 
-from marshmallow import fields
-
 from ._hooks import HookWrapper
 from .bot import MaxBot
 from .channels import ChannelManager
@@ -10,6 +8,7 @@ from .dialog_manager import DialogManager
 from .extensions import ExtensionManager
 from .flows.dialog_flow import DialogFlow
 from .jinja_env import create_jinja_env
+from .maxml import fields
 from .resources import (
     DirectoryResources,
     FileResources,

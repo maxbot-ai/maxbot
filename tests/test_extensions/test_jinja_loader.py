@@ -22,8 +22,8 @@ def test_include_text(tmp_path):
         + """%}
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="hello world")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "hello world"
 
 
 def test_include_maxml(tmp_path):
@@ -48,8 +48,8 @@ def test_include_maxml(tmp_path):
         + """%}
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="hello world")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "hello world"
 
 
 def test_macro_maxml(tmp_path):
@@ -77,8 +77,8 @@ def test_macro_maxml(tmp_path):
             {{ hello('world') }}
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="hello world")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "hello world"
 
 
 def test_use_macro(tmp_path):
@@ -104,8 +104,8 @@ def test_use_macro(tmp_path):
             {{ hello.do('world') }}
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="hello world")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "hello world"
 
 
 def test_indent(tmp_path):
@@ -132,8 +132,8 @@ I am MaxBot.
             {{ test.do()|indent }}
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="Hello! I am MaxBot.")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "Hello! I am MaxBot."
 
 
 def test_import_import(tmp_path):
@@ -166,8 +166,8 @@ I am {{ test2.do() }}.
 
     bot = MaxBot.from_file(bot_file)
 
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="Hello! I am MaxBot.")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "Hello! I am MaxBot."
 
 
 def test_use_slots_with_context(tmp_path):
@@ -195,8 +195,8 @@ I am {{ slots.name }}.
             {{ test.do()|indent }}
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="Hello! I am MaxBot.")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "Hello! I am MaxBot."
 
 
 def test_use_slots_as_argument(tmp_path):
@@ -224,8 +224,8 @@ I am {{ name }}.
             {{ test.do(slots.name)|indent }}
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="Hello! I am MaxBot.")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "Hello! I am MaxBot."
 
 
 def test_clear_slot(tmp_path):
@@ -254,8 +254,8 @@ def test_clear_slot(tmp_path):
             I am {{ slots.name|default('MaxBot', true) }}.
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="Hello! I am MaxBot.")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "Hello! I am MaxBot."
 
 
 def test_return_slot(tmp_path):
@@ -284,8 +284,8 @@ def test_return_slot(tmp_path):
             I am {{ slots.name }}.
     """
     )
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="Hello! I am MaxBot.")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "Hello! I am MaxBot."
 
 
 @pytest.mark.xfail(reason="expecting a snippet of macro here, see MAX-5237")
@@ -448,8 +448,8 @@ def test_relative_path(tmp_path, build_fn):
     )
 
     bot = build_fn(bot_file)
-    commands = bot.process_message("say hello")
-    assert commands == [dict(text="hello world")]
+    (command,) = bot.process_message("say hello")
+    assert command["text"] == "hello world"
 
 
 def test_import_reload(tmp_path):
@@ -475,8 +475,8 @@ def test_import_reload(tmp_path):
             {{ hello.do() }}
     """
     )
-    commands = bot.process_message("bla bla bla")
-    assert commands == [dict(text="step1")]
+    (command,) = bot.process_message("bla bla bla")
+    assert command["text"] == "step1"
 
     include_file.write_text(
         """
@@ -486,8 +486,8 @@ def test_import_reload(tmp_path):
     """
     )
 
-    commands = bot.process_message("bla bla bla")
-    assert commands == [dict(text="step2")]
+    (command,) = bot.process_message("bla bla bla")
+    assert command["text"] == "step2"
 
 
 def test_include_reload(tmp_path):
@@ -510,8 +510,8 @@ def test_include_reload(tmp_path):
         + """ %}
     """
     )
-    commands = bot.process_message("bla bla bla")
-    assert commands == [dict(text="step1")]
+    (command,) = bot.process_message("bla bla bla")
+    assert command["text"] == "step1"
 
     include_file.write_text(
         """
@@ -519,5 +519,5 @@ def test_include_reload(tmp_path):
     """
     )
 
-    commands = bot.process_message("bla bla bla")
-    assert commands == [dict(text="step2")]
+    (command,) = bot.process_message("bla bla bla")
+    assert command["text"] == "step2"

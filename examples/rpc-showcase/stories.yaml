@@ -36,8 +36,10 @@
       response: |
         Your order #123 has been shipped.
 
-        Thank you for being joining our bot!
-        Please, provide your name to get special 50% discount code ↓
+        <text>
+          Thank you for being joining our bot!
+          Please, provide your name to get special 50% discount code ↓
+        </text>
     - message: John
       response: "Great! Just use the discount code at checkout: XXXXX. Happy shopping!"
 - name: offer_discount_and_do_nothing
@@ -61,7 +63,7 @@
       response: |
         Your order #123 has been shipped.
 
-        Are you visiting our store downtown or the one in the mall?
+        <text>Are you visiting our store downtown or the one in the mall?</text>
     - message: mall
       response: Our retail store in the mall follows the mall operating hours of 9 AM to 9PM.
 - name: store_hours_and_do_nothing

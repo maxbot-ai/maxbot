@@ -1,5 +1,5 @@
 extensions:
-  format: { locale: en }
+  babel: { locale: en }
   datetime: {}
 channels:
   telegram:
@@ -50,7 +50,7 @@ dialog:
         prompt: |
             What day would you like to come in?
         found: |
-            {% if slots.date|date < now|date %}
+            {% if slots.date|date < utc_time.astimezone(""|tz)|date %}
                 You cannot make a reservation for a day in the past.
                 <prompt_again />
             {% elif not entities.time and not entities.number %}

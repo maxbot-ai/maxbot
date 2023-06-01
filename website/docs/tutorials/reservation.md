@@ -120,11 +120,11 @@ In next sections we improve the experience of users who interact with the node.
 
 When the values of `entities.date` and `entities.time` are saved, they are converted into a standardized ISO format. This standardized format is useful for performing calculations on the values, but you might not want to expose this reformatting to users. In this step, you will reformat the date (`2023-01-27`) and time (`17:00:00`) values that are referenced by the dialog.
 
-First of all, enable the format extension:
+First of all, enable the [babel extension](/extensions/babel.md):
 
 ```yaml
 extensions:
-  format: { locale: en }
+    babel: { locale: en }
 ```
 
 This will allow you to use the following template filters for variables.
@@ -164,18 +164,17 @@ So far, we have assumed that the user will provide the appropriate value types f
 
 ### Enable datetime extension
 
-You need to enable datetime extension to validate dates.
+You need to enable [datetime extension](/extensions/datetime.md) to validate dates.
 
 ```yaml
 extensions:
-  format: { locale: en }
+  babel: { locale: en }
 # highlight-next-line
   datetime: {}
 ```
 
-This extension allows you to use the following template globals and filters for variables.
+This extension allows you to use the following template filters for variables.
 
-* `now` - The current value of the date and time.
 * `x|date` - It converts value to the date object.
 * `x|time` - It converts value to the time object.
 
@@ -193,7 +192,7 @@ Add the `found` response for the `slots.date` slot. Use the following if-conditi
       What day would you like to come in?
 # highlight-start
   found: |
-      {% if slots.date|date < now|date %}
+      {% if slots.date|date < utc_time.astimezone(""|tz)|date %}
         You cannot make a reservation for a day in the past.
         <prompt_again />
       {% else %}
@@ -202,7 +201,10 @@ Add the `found` response for the `slots.date` slot. Use the following if-conditi
 # highlight-end
 ```
 
-If date is in the past, the bot uses `promt_again` command to clear the value of the  slot and prompt it again. The else-clause is executed if the user provides a valid date. It displays a simple confirmation lets the user know that her response was understood.
+The template global `utc_time` is used to determine the current date and time ([datetime](https://docs.python.org/3/library/datetime.html#datetime-objects)).
+By calling `utc_time.astimezone(""|tz)`, we get the local date and time (for current machine).
+
+If date is in the past, the bot uses `promt_again` command to clear the value of the slot and prompt it again. The else-clause is executed if the user provides a valid date. It displays a simple confirmation lets the user know that her response was understood.
 
 ### Check whether a time falls within the seating time window
 

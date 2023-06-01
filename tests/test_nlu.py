@@ -198,7 +198,7 @@ def test_spacy_matcher_entities(spacy_nlp):
     assert url.literal == "https://example.com"
 
 
-async def test_nlu(spacy_nlp):
+async def test_nlu(spacy_nlp, dialog_stub):
     hello = RecognizedIntent("hello", 0.3)
     goodbye = RecognizedIntent("goodbye", 0.6)
 
@@ -248,15 +248,15 @@ async def test_nlu(spacy_nlp):
     assert entities.menu.literal == menu_1.literal
 
 
-async def test_entities_overlap_datetime(spacy_nlp):
+async def test_entities_overlap_datetime(spacy_nlp, dialog_stub):
     nlu = Nlu(spacy_nlp)
     nlu.entity_recognizers = [RuleBasedEntities(spacy_nlp)]
-    intents, entities = await nlu({"text": "at 5 pm"})
+    intents, entities = await nlu(message={"text": "at 5 pm"})
     assert entities.time
     assert not entities.number
 
 
-async def test_entities_overlap_number(spacy_nlp):
+async def test_entities_overlap_number(spacy_nlp, dialog_stub):
     nlu = Nlu(spacy_nlp)
     nlu.entity_recognizers = [RuleBasedEntities(spacy_nlp)]
     intents, entities = await nlu({"text": "5 of us"})

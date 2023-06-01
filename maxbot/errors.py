@@ -259,16 +259,17 @@ class YamlSnippet(Snippet):
         return code.split("\n")
 
 
-class MarkdownSnippet(Snippet):
-    """A snippet of markdown document with pointer to specific line."""
+class XmlSnippet(Snippet):
+    """A snippet of XML document with pointer to specific line and column."""
 
-    def __init__(self, lines, line):
+    def __init__(self, lines, lineno, column):
         """Create new class instance.
 
         :param list[str] lines: Lines with the source code.
-        :param int line: A line number to point to.
+        :param int lineno: A line number to point to.
+        :param int column: Number of comunt.
         """
-        super().__init__("<Markdown document>", lines, line, 0, False)
+        super().__init__("<Xml document>", lines, lineno, column, exact_column=True)
 
     def format(self):
         """Build a string description and a code snippet with a pointer."""

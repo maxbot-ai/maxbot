@@ -1,11 +1,11 @@
 from unittest.mock import AsyncMock, sentinel
 
 import pytest
-from marshmallow import Schema, fields
 
 from maxbot import MaxBot
 from maxbot.channels import Channel, ChannelFactory, ChannelManager, ChannelsCollection
 from maxbot.channels._manager import BUILTIN_CHANNELS
+from maxbot.maxml import Schema, fields
 from maxbot.resources import InlineResources
 
 

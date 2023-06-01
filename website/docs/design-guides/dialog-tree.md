@@ -344,9 +344,9 @@ In the example, the bot can recognize the user's phone number and place a reques
     - name: back_call
       examples:
         - Call me back, please
-        - Сould you call me
+        - Could you call me
         - I want to get a call back
-        - Сan you call me
+        - Can you call me
         - a callback please
         - Give me a call.
   entities:

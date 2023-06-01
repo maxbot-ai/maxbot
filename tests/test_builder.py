@@ -1,12 +1,12 @@
 import sys
-from unittest.mock import AsyncMock, Mock, sentinel
+from unittest.mock import AsyncMock, MagicMock, Mock, sentinel
 
 import pytest
-from marshmallow import Schema, fields
 
 from maxbot.bot import MaxBot
 from maxbot.builder import BotBuilder
 from maxbot.errors import BotError
+from maxbot.maxml import Schema, fields
 
 
 @pytest.fixture
@@ -162,7 +162,7 @@ def test_template_global(builder):
 
 
 def test_before_turn(builder):
-    hook = AsyncMock()
+    hook = MagicMock(return_value=AsyncMock())
     builder.before_turn(hook)
 
     bot = builder.build()
@@ -171,7 +171,7 @@ def test_before_turn(builder):
 
 
 def test_after_turn(builder):
-    hook = AsyncMock()
+    hook = MagicMock(return_value=AsyncMock())
     builder.after_turn(hook)
 
     bot = builder.build()

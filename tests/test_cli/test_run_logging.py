@@ -3,12 +3,12 @@ from unittest.mock import Mock
 
 import pytest
 from click.testing import CliRunner
-from marshmallow import fields
 from sanic import Sanic
 
 import maxbot.cli
 from maxbot import MaxBot
 from maxbot.errors import BotError, YamlSnippet
+from maxbot.maxml import fields
 from maxbot.schemas import ResourceSchema
 
 

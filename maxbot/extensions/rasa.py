@@ -7,10 +7,10 @@ from urllib.parse import urljoin
 
 import httpx
 from dateutil.parser import isoparse
-from marshmallow import Schema, fields
 
 from ..context import EntitiesResult, IntentsResult, RecognizedEntity, RecognizedIntent
 from ..errors import BotError
+from ..maxml import Schema, fields
 from ..schemas import ResourceSchema
 
 logger = logging.getLogger(__name__)
@@ -136,7 +136,7 @@ class _Nlu:
         self.threshold = threshold
         logger.debug("threshold = %s", self.threshold)
 
-    async def __call__(self, message):
+    async def __call__(self, message, utc_time=None):
         text = message.get("text")
         if not text:
             return IntentsResult(), EntitiesResult()

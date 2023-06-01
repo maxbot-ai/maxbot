@@ -6,10 +6,10 @@ from collections.abc import Hashable
 
 import marshmallow.exceptions
 import yaml
-from marshmallow import Schema, fields, post_load, pre_load
 
-from .errors import BotError, MarkdownSnippet, YamlSnippet, YamlSymbols
-from .markdown import MarkdownRender
+from .errors import BotError, XmlSnippet, YamlSnippet, YamlSymbols
+from .maxml import Schema, fields, markup, post_load, pre_load
+from .maxml.xml_parser import XmlParser
 
 
 class LoaderFactory(yaml.BaseLoader):  # pylint: disable=R0901
@@ -32,6 +32,20 @@ class LoaderFactory(yaml.BaseLoader):  # pylint: disable=R0901
             return yaml.load(data, Loader=cls)  # nosec B506
         except yaml.MarkedYAMLError as exc:
             raise YamlParsingError(exc) from exc
+
+    @classmethod
+    def register_unknown_tag_error(cls):
+        """Raise `yaml.constructor.ConstructorError` on unknown tag."""
+
+        def _raise_constructor_error(loader, node):
+            raise yaml.constructor.ConstructorError(
+                None,
+                None,
+                f"could not determine a constructor for the tag {node.tag!r}",
+                node.start_mark,
+            )
+
+        cls.add_constructor(None, _raise_constructor_error)
 
     @classmethod
     def register_variable_substitution(cls):
@@ -176,6 +190,7 @@ class RenderConfig:
         """Create new class instance."""
         self.Loader = LoaderFactory.new_loader()
         self.Loader.register_variable_substitution()
+        self.Loader.register_unknown_tag_error()
         self.Loader.set_pre_construct_strict_map_checker()
         self.Loader.set_post_construct_debug_watcher()
 
@@ -380,23 +395,13 @@ class MessageSchema(ResourceSchema):
         return data
 
 
-class ImageCommand(Schema):
-    """An image command payload."""
-
-    # HTTP URL to get a file from the Internet.
-    url = fields.Url(required=True)
-
-    # Caption of the image to be sent.
-    caption = fields.Str(metadata={"maxml": "element"})
-
-
 class MaxmlSchema(MarshmallowSchema):
     """Base schema for MAXML commands."""
 
     class Meta:
         """Options object for a Schema."""
 
-        render_module = MarkdownRender()
+        render_module = XmlParser()
 
     class _Error(Exception):
         def __init__(self, message, data, key):
@@ -408,28 +413,33 @@ class MaxmlSchema(MarshmallowSchema):
         return self._Error(message, data, key)
 
     def loads(self, json_data, **kwargs):
-        """Load commands from Markdown document."""
+        """Load commands from headless XML document."""
         symbols = {}
-        try:
-            unvalidated = self.opts.render_module.loads(
-                json_data, maxml_command_schema=self, maxml_symbols=symbols
-            )
-        except self.opts.render_module.EXCEPTION_CLASS as exc:
-            raise BotError(
-                exc.message, MarkdownSnippet(json_data.splitlines(), exc.lineno)
-            ) from exc
+        unvalidated = self.opts.render_module.loads(
+            json_data, maxml_command_schema=self, maxml_symbols=symbols
+        )
 
         try:
             return self.load(unvalidated, **kwargs)
         except self._Error as exc:
-            linenum = None
+            ptr = None
             if isinstance(exc.data, dict) and exc.key is not None:
-                linenum = symbols.get(id(exc.data.get(exc.key)))
-            if linenum is None:
-                linenum = symbols.get(id(exc.data))
-            snippet = None if linenum is None else MarkdownSnippet(json_data.splitlines(), linenum)
+                ptr = symbols.get(id(exc.data.get(exc.key)))
+            if ptr is None:
+                ptr = symbols.get(id(exc.data))
+            snippet = XmlSnippet(json_data.splitlines(), ptr.lineno, ptr.column) if ptr else None
             # chain with original marshmallow.exceptions.ValidationError
             raise BotError(exc.message, snippet) from exc.__cause__
+
+
+class ImageCommand(Schema):
+    """An image command payload."""
+
+    # HTTP URL to get a file from the Internet.
+    url = fields.Url(required=True)
+
+    # Caption of the image to be sent.
+    caption = markup.Field()
 
 
 class CommandSchema(MaxmlSchema):
@@ -443,9 +453,9 @@ class CommandSchema(MaxmlSchema):
 
         CommandSchema(many=True).loads('''
             Hello world!
-            ![](http://example.com/hello.png)
+            <image url="http://example.com/hello.png" />
         ''')
-        # [{'text': 'Hello world!'}, {'image': {'url': 'http://example.com/hello.png'}}]
+        # [{'text': <maxml.markup.Value'Hello world!'>}, {'image': {'url': 'http://example.com/hello.png'}}]
 
     The schema supports most widely used command types in a platform-independent way. You can
     customize the schema by adding new types and overriding existing types. For example, given
@@ -478,7 +488,7 @@ class CommandSchema(MaxmlSchema):
     """
 
     # Text message.
-    text = fields.Str()
+    text = markup.Field()
 
     # Image message.
     image = fields.Nested(ImageCommand)

@@ -1,7 +1,11 @@
+import pytest
+
 from maxbot.context import (
     EntitiesProxy,
     EntitiesResult,
+    IntentsResult,
     RecognizedEntity,
+    RecognizedIntent,
     StateVariables,
     TurnContext,
 )
@@ -9,10 +13,11 @@ from maxbot.flows._base import DigressionResult, FlowResult
 from maxbot.flows.slot_filling import HandlerSchema, SlotFilling, SlotSchema
 
 
-def make_context(state=None, entities=None):
+def make_context(state=None, intents=None, entities=None):
     ctx = TurnContext(
         dialog=None,
         message={"text": "hello"},
+        intents=IntentsResult.resolve(intents or []),
         entities=entities or EntitiesResult(),
         state=StateVariables(slots={}, components={"xxx": state} if state else {}),
     )
@@ -102,6 +107,24 @@ async def test_from_entity():
     ctx, state = make_context(entities=entities)
     assert await model(ctx, state) == FlowResult.DONE
     assert ctx.state.slots == {"slot1": 1}
+    assert state == {"slot_in_focus": None}
+
+
+async def test_from_recognized_intent():
+    intent = RecognizedIntent(name="yes", confidence=1.0)
+
+    model = SlotFilling(
+        SlotSchema(many=True).loads(
+            """
+      - name: slot1
+        check_for: intents.yes
+    """
+        ),
+        [],
+    )
+    ctx, state = make_context(intents=[intent])
+    assert await model(ctx, state) == FlowResult.DONE
+    assert ctx.state.slots == {"slot1": True}
     assert state == {"slot_in_focus": None}
 
 

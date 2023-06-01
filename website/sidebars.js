@@ -60,11 +60,12 @@ const sidebars = {
         'design-guides/dialog-tree',
         'design-guides/slot-filling',
         'design-guides/digressions',
-        'design-guides/markdown',
+        'design-guides/maxml',
         'design-guides/state',
         'design-guides/templates',
         'design-guides/subtrees',
         'design-guides/rpc',
+        'design-guides/stories'
       ],
     },
     {
@@ -91,7 +92,8 @@ const sidebars = {
               'design-reference/dictionaries',
               'design-reference/numbers',
             ]
-        }
+        },
+        'design-reference/stories'
       ],
     },
     {
@@ -102,6 +104,8 @@ const sidebars = {
       },
       collapsed: true,
       items: [
+        'extensions/datetime',
+        'extensions/babel',
         'extensions/rasa',
         'extensions/jinja_loader',
       ],
@@ -119,7 +123,8 @@ const sidebars = {
         'coding-guides/resources',
         'coding-guides/channels',
         'coding-guides/extensions',
-        'coding-guides/packaging'
+        'coding-guides/packaging',
+        'coding-guides/maxml'
       ],
     },
   ],

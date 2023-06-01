@@ -1,12 +1,14 @@
 """The context of the dialog turns."""
 import logging
 from dataclasses import dataclass, field, fields
+from datetime import datetime, timezone
 from operator import attrgetter
 from types import SimpleNamespace
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from .errors import BotError
 from .jinja_env import StateNamespace
+from .maxml import Schema
 
 logger = logging.getLogger(__name__)
 
@@ -436,15 +438,9 @@ class RpcContext:
             yield "request", self.request
 
 
-@dataclass(frozen=True)
-class LogRecord:
-    """Contains all information about the logged event."""
-
-    # The level of the logging event.
-    level: str
-
-    # The logged message of any type.
-    message: Any
+def get_utc_time_default():
+    """Return current time in UTC (default factory for TurnContext.utc_time)."""
+    return datetime.now(timezone.utc)
 
 
 @dataclass(frozen=True)
@@ -456,6 +452,9 @@ class TurnContext:
 
     # State variables of the dialog.
     state: StateVariables = field(default_factory=StateVariables)
+
+    # Date and time of turn (in UTC)
+    utc_time: datetime = field(default_factory=get_utc_time_default)
 
     # User message processed by the bot.
     message: dict = field(default_factory=dict)
@@ -472,11 +471,14 @@ class TurnContext:
     # Additional variables for the scenario context.
     scenario: dict = field(default_factory=SimpleNamespace, init=False)
 
+    # Process user message journal
+    journal_events: list[dict] = field(default_factory=list, init=False)
+
     # Commands to respond to the user.
     commands: list[dict] = field(default_factory=list, init=False)
 
-    # Logged records.
-    logs: list[LogRecord] = field(default_factory=list, init=False)
+    # Schema of `.commands`
+    command_schema: Optional[Schema] = field(default=None)
 
     # An error occured.
     error: Optional[BotError] = field(default=None, init=False)
@@ -545,6 +547,8 @@ class TurnContext:
                 "slots": StateNamespace(self.state.slots),
                 "rpc": self.rpc,
                 "params": self.rpc.request.params if self.rpc.request else {},
+                "utc_time": self.utc_time,
+                "utc_today": self.utc_time.date(),
                 "_turn_context": self,
             }
         )
@@ -559,13 +563,25 @@ class TurnContext:
             if not hasattr(self, key):
                 setattr(self, key, value)
 
+    def journal_event(self, event_type, payload):
+        """Add new journal event.
+
+        :param str event_type: Type of the event.
+        :param any payload: Payload of the event.
+        :return any: Payload of inserted event.
+        """
+        logger.debug("%s %s", event_type, payload)
+        event = {"type": event_type, "payload": payload}
+        self.journal_events.append(event)
+        return event["payload"]
+
     def log(self, level, message):
         """Log the message.
 
         :param str level: Log level.
         :param any message: Log message.
         """
-        self.logs.append(LogRecord(level, message))
+        self.journal_event("log", {"level": level, "message": message})
 
     def debug(self, message):
         """Log the message with level DEBUG.
@@ -587,3 +603,16 @@ class TurnContext:
         :param BotError error
         """
         object.__setattr__(self, "error", error)
+
+    @staticmethod
+    def extract_log_event(event):
+        """Try to extract level and message from journal event.
+
+        :param dict event: Event from TrunContext.journal_events.
+        :return tuple: Extracted level and message or (None, None)
+        """
+        if event.get("type") == "log":
+            payload = event.get("payload")
+            if isinstance(payload, dict):
+                return payload.get("level"), payload.get("message")
+        return None, None

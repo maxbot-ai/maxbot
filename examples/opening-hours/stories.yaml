@@ -1,0 +1,30 @@
+- name: Sunday, 10 am
+  turns:
+    - utc_time: "2023-05-21T14:00+00:00"
+      message: You are open?
+      response: Now we are not woking. We are open from 10 am to 6 pm every weekday.
+- name: Monday, 9 am
+  turns:
+    - utc_time: "2023-05-22T13:00+00:00"
+      message: You are open?
+      response: Now we are not woking. We are open from 10 am to 6 pm every weekday.
+- name: Monday, 10 am
+  turns:
+    - utc_time: "2023-05-22T14:00+00:00"
+      message: You are open?
+      response: We are open, welcome!
+- name: Friday, 5 pm
+  turns:
+    - utc_time: "2023-05-26T21:00+00:00"
+      message: You are open?
+      response: We are open, welcome!
+- name: Friday, 6 pm
+  turns:
+    - utc_time: "2023-05-26T22:00+00:00"
+      message: You are open?
+      response: Now we are not woking. We are open from 10 am to 6 pm every weekday.
+- name: Saturday, 10 am
+  turns:
+    - utc_time: "2023-05-27T14:00+00:00"
+      message: You are open?
+      response: Now we are not woking. We are open from 10 am to 6 pm every weekday.

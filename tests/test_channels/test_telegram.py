@@ -125,10 +125,9 @@ async def test_receive_unknown(update_start, bot):
 
 async def test_send_text(bot, dialog, respx_mock):
     respx_mock.post(f"{API_URL}/sendMessage").respond(json={"result": {}})
-    await bot.channels.telegram.call_senders(
-        {"text": "hello world"},
-        dialog,
-    )
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.telegram.call_senders({"text": text}, dialog)
     request = respx_mock.calls.last.request
     assert request.content == b"chat_id=123456789&text=hello+world"
 
@@ -159,8 +158,10 @@ async def test_send_image(bot, dialog, respx_mock):
     respx_mock.post(f"{API_URL}/sendPhoto").respond(json={"result": {}})
 
     url = "http://example.com/123.jpg"
+    caption = Mock()
+    caption.render = Mock(return_value=MESSAGE_TEXT)
     await bot.channels.telegram.call_senders(
-        {"image": {"url": url, "caption": MESSAGE_TEXT}},
+        {"image": {"url": url, "caption": caption}},
         dialog,
     )
     request = respx_mock.calls.last.request

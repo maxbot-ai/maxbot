@@ -5,8 +5,9 @@ from functools import cached_property
 from urllib.parse import urljoin
 
 import httpx
-from marshmallow import Schema, fields
 from telegram import Bot, Update
+
+from ..maxml import Schema, fields
 
 TG_FILE_URL = "https://api.telegram.org/file"
 
@@ -73,7 +74,7 @@ class TelegramChannel:
         :param dict command: A command with the payload :attr:`~maxbot.schemas.CommandSchema.text`.
         :param dict dialog: A dialog we respond in, with the schema :class:`~maxbot.schemas.DialogSchema`.
         """
-        await self.bot.send_message(dialog["user_id"], command["text"])
+        await self.bot.send_message(dialog["user_id"], command["text"].render())
 
     async def receive_image(self, update: Update):
         """Receive an image message from the channel.
@@ -105,6 +106,7 @@ class TelegramChannel:
         :param dict dialog: A dialog we respond in, with the schema :class:`~maxbot.schemas.DialogSchema`.
         """
         image = command["image"]
+        caption = image.get("caption")
         # Error on send_photo with url starts with {TG_FILE_URL}:
         # telegram.error.BadRequest: Wrong file identifier/http url specified
         # In this case send content photo
@@ -114,11 +116,13 @@ class TelegramChannel:
             await self.bot.send_photo(
                 dialog["user_id"],
                 response.content,
-                image.get("caption"),
+                None if caption is None else caption.render(),
                 filename=os.path.basename(response.url.path),
             )
         else:
-            await self.bot.send_photo(dialog["user_id"], image["url"], image.get("caption"))
+            await self.bot.send_photo(
+                dialog["user_id"], image["url"], None if caption is None else caption.render()
+            )
 
     def blueprint(self, callback, public_url=None, webhook_path=None):
         """Create web application blueprint to receive incoming updates.

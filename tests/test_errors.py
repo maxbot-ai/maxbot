@@ -2,9 +2,9 @@ from textwrap import indent
 
 import pytest
 import yaml
-from marshmallow import fields
 
 from maxbot.errors import BotError, YamlSnippet, YamlSymbols
+from maxbot.maxml import fields
 from maxbot.schemas import ResourceSchema
 
 

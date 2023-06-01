@@ -1,8 +1,14 @@
 import pytest
-from marshmallow import Schema, fields
 
 from maxbot.errors import BotError
-from maxbot.schemas import CommandSchema, MarshmallowSchema, MessageSchema, ResourceSchema
+from maxbot.maxml import Schema, fields
+from maxbot.schemas import (
+    CommandSchema,
+    MarshmallowSchema,
+    MessageSchema,
+    ResourceSchema,
+    YamlParsingError,
+)
 
 
 def test_all_scalars_are_strings():
@@ -34,22 +40,14 @@ def test_config():
     assert C().loads("{k1: xxx, k2: 123}") == {"k1": "xxx", "k2": 123.0}
 
 
-def test_commands_short_syntax_list():
-    # @see hook CommandSchema.short_syntax_list
-    assert CommandSchema(many=True).loads("hello world") == [{"text": "hello world"}]
-
-
 def test_messages_short_syntax():
     # @see hook MessageSchema.short_syntax
     assert MessageSchema().loads("hello world") == {"text": "hello world"}
 
 
-def test_loads_text():
-    (command,) = CommandSchema(many=True).loads(
-        """
-        <text>Hello world!</text>
-    """
-    )
+@pytest.mark.parametrize("doc", ("Hello world!", "<text>Hello world!</text>"))
+def test_loads_text(doc):
+    (command,) = CommandSchema(many=True).loads(doc)
     assert command == {"text": "Hello world!"}
 
 
@@ -289,4 +287,19 @@ def test_misprint_dictionary_instead_of_string():
         '  in "<unicode string>", line 1, column 5:\n'
         "    s: {{ a.b }}\n"
         "        ^^^\n"
+    )
+
+
+def test_error_on_unknown_tag():
+    class C(ResourceSchema):
+        s = fields.String()
+
+    with pytest.raises(YamlParsingError) as excinfo:
+        C().loads("s: !UNK")
+
+    assert str(excinfo.value) == (
+        "caused by yaml.constructor.ConstructorError: could not determine a constructor for the tag '!UNK'\n"
+        '  in "<unicode string>", line 1, column 4:\n'
+        "    s: !UNK\n"
+        "       ^^^\n"
     )

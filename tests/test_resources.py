@@ -5,10 +5,10 @@ from unittest.mock import Mock
 
 import pytest
 import yaml
-from marshmallow import Schema, fields
 
 from maxbot.errors import BotError
 from maxbot.flows.dialog_tree import DialogNodeSchema, SubtreeSchema
+from maxbot.maxml import Schema, fields
 from maxbot.nlu import EntitySchema, IntentSchema
 from maxbot.resources import (
     DictResources,
@@ -460,3 +460,11 @@ def test_poll_intents(tmp_path, mtime_workaround_func):
     """
     )
     assert rs.poll() == {"intents"}
+
+
+def test_resource_schema_file_error(tmp_path):
+    with pytest.raises(BotError) as excinfo:
+        ResourceSchema().load_file(tmp_path / "nonexistent_file")
+    assert str(excinfo.value).startswith(
+        "caused by builtins.FileNotFoundError: Could not load file"
+    )

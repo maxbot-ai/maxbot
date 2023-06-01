@@ -3,14 +3,13 @@ import importlib.metadata
 import pkgutil
 from abc import abstractmethod
 
-from marshmallow import Schema, fields
-
+from ..maxml import Schema, fields
 from ..schemas import ResourceSchema
 
 BUILTIN_EXTENSIONS = {
     "rest": "maxbot.extensions.rest.RestExtension",
     "datetime": "maxbot.extensions.datetime.DatetimeExtension",
-    "format": "maxbot.extensions.format.FormatExtension",
+    "babel": "maxbot.extensions.babel.BabelExtension",
     "rasa": "maxbot.extensions.rasa.RasaExtension",
     "strict_undefined": "maxbot.extensions.strict_undefined.StrictUndefinedExtension",
     "jinja_loader": "maxbot.extensions.jinja_loader.jinja_loader",

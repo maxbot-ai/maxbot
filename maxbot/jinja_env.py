@@ -3,64 +3,12 @@ import logging
 
 import jinja2
 from jinja2 import nodes
-from jinja2.compiler import CodeGenerator
 from jinja2.exceptions import TemplateRuntimeError, UndefinedError
 from jinja2.ext import Extension
-from jinja2.runtime import Macro
 from jinja2.utils import Namespace, missing
-
-from .markdown import Markup, escape
+from markupsafe import Markup
 
 logger = logging.getLogger(__name__)
-
-
-class _AutoEscapeCodeGenerator(CodeGenerator):
-    def visit_Template(self, *args, **kwargs):  # noqa: N802
-        super().visit_Template(*args, **kwargs)
-        self.writeline("")
-        self.writeline("escape = environment.escape_fn")
-        self.writeline("Markup = environment.markup_class")
-        self.writeline("Macro = environment.macro_class")
-
-
-class _AutoEscapeMacro(Macro):
-    async def _async_invoke(self, arguments, autoescape):
-        return Markup(await self._func(*arguments))
-
-    def _invoke(self, arguments, autoescape):
-        assert autoescape
-        assert self._environment.is_async
-        return self._async_invoke(arguments, autoescape)
-
-
-class AutoEscapeEnvironment(jinja2.Environment):
-    """Jinja environment with autoescaping HTML and Markdown sequences."""
-
-    code_generator_class = _AutoEscapeCodeGenerator
-
-    def __init__(self, **kwargs):
-        """Create new class instance."""
-        super().__init__(**{**kwargs, **{"autoescape": True}})
-        for name in self.filters:
-            self._filter_return_markup(name)
-        self.filters.update(e=escape, escape=escape)
-        self.escape_fn = escape
-        self.markup_class = Markup
-        self.macro_class = _AutoEscapeMacro
-
-    def _filter_return_markup(self, name):
-        original_fn = self.filters[name]
-
-        def wrapper(*arga, **argw):
-            rv = original_fn(*arga, **argw)
-            if hasattr(rv, "__html__") and not hasattr(rv, "__markdown__"):
-                rv = Markup(rv.__html__())
-            return rv
-
-        self.filters[name] = wrapper
-        if hasattr(original_fn, "jinja_pass_arg"):
-            # @pass_* decorators
-            self.filters[name].jinja_pass_arg = original_fn.jinja_pass_arg
 
 
 def create_jinja_env(options=None):
@@ -92,8 +40,8 @@ def create_jinja_env(options=None):
     options.setdefault("undefined", EnclosedUndefined)
     options.setdefault("trim_blocks", True)
     options.setdefault("lstrip_blocks", True)
-    env_class = AutoEscapeEnvironment if options.get("autoescape", True) else jinja2.Environment
-    env = env_class(enable_async=True, **options)  # nosec: B701
+    options.setdefault("autoescape", True)
+    env = jinja2.Environment(enable_async=True, **options)  # nosec: B701
     env.filters.update(mandatory=mandatory)
     env.filters.update(nl2br=nl2br)
     env.globals.update(mandatory=mandatory)

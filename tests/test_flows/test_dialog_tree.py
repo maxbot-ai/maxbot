@@ -41,6 +41,9 @@ async def test_root_node_match():
     assert await model(ctx, state) == FlowResult.DONE
     assert ctx.commands == [{"text": "triggered"}]
     assert state == {"node_stack": []}
+    event1, event2 = ctx.journal_events
+    assert event1 == {"type": "node_triggered", "payload": {"node": {"condition": "true"}}}
+    assert event2 == {"type": "response", "payload": {"end": {}, "node": {"condition": "true"}}}
 
 
 async def test_root_node_match_single():
@@ -179,9 +182,9 @@ async def test_followup_followup_mismatch():
     assert await model(ctx, state) == FlowResult.LISTEN
     assert ctx.commands == [{"text": "root triggered"}]
     assert state == {"node_stack": []}
-    (log,) = ctx.logs
-    assert log.message == "Nothing matched from followup nodes of 'root1'."
-    assert log.level == "WARNING"
+    (log,) = [e for e in ctx.journal_events if e.get("type") == "log"]
+    assert log["payload"]["message"] == "Nothing matched from followup nodes of 'root1'."
+    assert log["payload"]["level"] == "WARNING"
 
 
 async def test_focus_followup_match():
@@ -291,9 +294,11 @@ async def test_jumpt_to_condition_mismatch():
     assert await model(ctx, state) == FlowResult.DONE
     assert ctx.commands == [{"text": "jump from triggered"}]
     assert state == {"node_stack": []}
-    (log,) = ctx.logs
-    assert log.message == "Nothing matched when jumping to 'label1' and its siblings."
-    assert log.level == "WARNING"
+    (log,) = [e for e in ctx.journal_events if e.get("type") == "log"]
+    assert (
+        log["payload"]["message"] == "Nothing matched when jumping to 'label1' and its siblings."
+    )
+    assert log["payload"]["level"] == "WARNING"
 
 
 async def test_jumpt_to_response():

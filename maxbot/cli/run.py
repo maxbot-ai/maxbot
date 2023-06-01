@@ -8,7 +8,7 @@ from ._ngrok import ask_ngrok
 
 
 @click.command(
-    short_help="run the bot",
+    short_help="Run the bot",
     context_settings={
         # less is more readable, but make sure the contents fits on one page
         "max_content_width": 120
@@ -83,14 +83,29 @@ from ._ngrok import ask_ngrok
     type=str,
     default="console",
     show_default=True,
-    help="Log to console or file:/path/to/file.log.",
+    help=(
+        "Write the developer logs to console or file:/path/to/file.log. "
+        "Use the --journal-file option to redirect the journal."
+    ),
 )
 @click.option(
-    "--journal",
-    type=str,
-    default="console",
+    "--quiet",
+    "-q",
+    is_flag=True,
+    default=False,
+    help="Do not log to console.",
+)
+@click.option(
+    "--journal-file",
+    type=click.File(mode="a", encoding="utf8"),
+    help="Write the journal to the file.",
+)
+@click.option(
+    "--journal-output",
+    type=click.Choice(choices=["json", "yaml"]),
+    default="json",
     show_default=True,
-    help="Journal conversation to console or file:/var/log/maxbot.jsonl.",
+    help="Journal file format",
 )
 @click.pass_context
 def run(
@@ -105,7 +120,9 @@ def run(
     autoreload,
     verbose,
     logger,
-    journal,
+    quiet,
+    journal_file,
+    journal_output,
 ):
     """
     Run the bot.
@@ -145,10 +162,15 @@ def run(
     maxbot run --bot bot.yaml --logger file:/var/log/maxbot.log
 
     \b
-    # journal to file
-    maxbot run --bot bot.yaml --journal file:/var/log/maxbot.jsonl
+    # journal to file and to console
+    maxbot run --bot bot.yaml --journal-file /var/log/maxbot.jsonl
+
+    \b
+    # journal to file only
+    maxbot run --bot bot.yaml -q --journal-file /var/log/maxbot.jsonl
     """
-    configure_logging(logger, verbose)
+    if not quiet:
+        configure_logging(logger, verbose)
 
     from ._rich import Progress
 
@@ -156,7 +178,7 @@ def run(
         progress.add_task("Loading resources", total=None)
 
         bot = resolve_bot(bot_spec)
-        bot.dialog_manager.journal(create_journal(journal))
+        bot.dialog_manager.journal(create_journal(verbose, quiet, journal_file, journal_output))
 
     polling_conflicts = [
         next(p.get_error_hint(ctx) for p in ctx.command.params if p.name == name)

@@ -2,10 +2,10 @@
 from dataclasses import dataclass, field
 
 import jinja2
-from marshmallow import ValidationError, fields
 
 from .errors import BotError, YamlSnippet
 from .jinja_env import create_jinja_env
+from .maxml import ValidationError, fields
 from .schemas import CommandSchema
 
 # Default jinja environment for :class:`~Expression` and :class:`~Scenario'.

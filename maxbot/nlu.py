@@ -6,9 +6,8 @@ from functools import cached_property
 from itertools import chain
 from operator import attrgetter
 
-from marshmallow import fields, validate
-
 from .context import EntitiesResult, IntentsResult, RecognizedEntity, RecognizedIntent
+from .maxml import fields, validate
 from .resources import InlineResources
 from .schemas import ResourceSchema
 
@@ -155,6 +154,7 @@ class SimilarityRecognizer:
         for intent in intents:
             self.examples.extend([self.spacy_nlp.make_doc(e) for e in intent["examples"]])
             self.labels.extend([intent["name"]] * len(intent["examples"]))
+        logger.debug("%s similarity based intents loaded", len(intents))
 
     def _preprocess(self, doc):
         return [t.lower_ for t in doc]
@@ -213,11 +213,13 @@ class PhraseEntities:
                 self.ids[match_id] = (entity["name"], value["name"])
                 patterns = list(self.spacy_nlp.pipe(value["phrases"]))
                 self._matcher.add(key, patterns)
+        logger.debug("%s phrase entities loaded", len([e for e in entities if e["values"]]))
 
-    def __call__(self, doc):
+    def __call__(self, doc, utc_time=None):
         """Recognize entities in the given `doc`.
 
         :param spacy.tokens.Doc doc: Spacy doc containing the user input.
+        :param datetime utc_time: Date and time of dialog turn.
         :return Iterable[RecognizedEntity]: Recognized pharse entities.
         """
         if self._matcher:
@@ -251,11 +253,13 @@ class RegexpEntities:
                             "pattern": re.compile(regexp),
                         }
                     )
+        logger.debug("%s regexp entities loaded", len(self.regexps))
 
-    def __call__(self, doc):
+    def __call__(self, doc, utc_time=None):
         """Recognize entities in the given `doc`.
 
         :param spacy.tokens.Doc doc: Spacy doc containing the user input.
+        :param datetime utc_time: Date and time of dialog turn.
         :return Iterable[RecognizedEntity]: Recognized regexps entities.
         """
         for p in self.regexps:
@@ -302,10 +306,11 @@ class SpacyMatcherEntities:
         matcher.add("url", [[{"LIKE_URL": True}]])
         return matcher
 
-    def __call__(self, doc):
+    def __call__(self, doc, utc_time=None):
         """Recognize entities in the given `doc`.
 
         :param spacy.tokens.Doc doc: Spacy doc containing the user input.
+        :param datetime utc_time: Date and time of dialog turn.
         :return Iterable[RecognizedEntity]: Recognized entities.
         """
         matches = self.matcher(doc, as_spans=True)
@@ -349,10 +354,11 @@ class DateParserEntities:
 
     ddp = None
 
-    def __call__(self, doc):
+    def __call__(self, doc, utc_time=None):
         """Recognize entities in the given `doc`.
 
         :param spacy.tokens.Doc doc: Spacy doc containing the user input.
+        :param datetime utc_time: Date and time of dialog turn.
         :return Iterable[RecognizedEntity]: Recognized entities.
         """
         from dateparser import parse
@@ -367,10 +373,12 @@ class DateParserEntities:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
+            search_dates_settings = {"PREFER_DATES_FROM": "future"}
+            if utc_time:
+                search_dates_settings["RELATIVE_BASE"] = utc_time
+
             shift = 0
-            results = search_dates(
-                doc.text, languages=["en"], settings={"PREFER_DATES_FROM": "future"}
-            )
+            results = search_dates(doc.text, languages=["en"], settings=search_dates_settings)
             if results is None:
                 return
             for literal, dt in results:
@@ -405,6 +413,7 @@ class RuleBasedEntities:
 
         :param spacy.Language nlp: Spacy language model.
         """
+        self._spacy_nlp = spacy_nlp
         self.dateparser_entities = DateParserEntities()
         self.spacy_matcher_entities = SpacyMatcherEntities(spacy_nlp)
 
@@ -419,17 +428,18 @@ class RuleBasedEntities:
         rv.extend(self.dateparser_entities.builtin_definitions)
         return rv
 
-    def __call__(self, doc):
+    def __call__(self, doc, utc_time=None):
         """Recognize entities in the given `doc`.
 
         :param spacy.tokens.Doc doc: Spacy doc containing the user input.
+        :param datetime utc_time: Date and time of dialog turn.
         :return Iterable[RecognizedEntity]: Recognized entities.
         """
         seen_chars = set()
-        for entity in self.dateparser_entities(doc):
+        for entity in self.dateparser_entities(doc, utc_time=utc_time):
             seen_chars.update(range(entity.start_char, entity.end_char))
             yield entity
-        for entity in self.spacy_matcher_entities(doc):
+        for entity in self.spacy_matcher_entities(doc, utc_time=utc_time):
             if entity.name == "number" and (
                 entity.start_char in seen_chars or entity.end_char - 1 in seen_chars
             ):
@@ -446,7 +456,7 @@ class Nlu:
     def __init__(self, spacy_nlp=None):
         """Create new class instance.
 
-        :param spacy.Language nlp: Spacy language model.
+        :param spacy.Language spacy_nlp: Spacy language model.
         """
         self._spacy_nlp = spacy_nlp
         self._intent_recognizer = None
@@ -543,12 +553,13 @@ class Nlu:
         """
         self.load_resources(InlineResources(source))
 
-    async def __call__(self, message):
+    async def __call__(self, message, utc_time=None):
         """Recognize intents and entities for the given message.
 
         Uses `message['text']` as the user utterance. If the key is missing, it skips recognition.
 
         :param dict message: A user message that matched :class:`~MessageSchema`.
+        :param datetime utc_time: Date and time of dialog turn.
         :return Tuple[IntentsResult, EntitiesResult]: Recognized intents and entities.
         """
         intents, entities = IntentsResult(), EntitiesResult()
@@ -562,7 +573,8 @@ class Nlu:
             entities = EntitiesResult.resolve(
                 list(
                     chain.from_iterable(
-                        recognizer(doc=doc) for recognizer in self.entity_recognizers
+                        recognizer(doc=doc, utc_time=utc_time)
+                        for recognizer in self.entity_recognizers
                     )
                 ),
                 self.resolve_entity_definitions(),

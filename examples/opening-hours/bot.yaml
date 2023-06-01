@@ -1,0 +1,26 @@
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_API_KEY}
+extensions:
+  datetime: {}
+intents:
+  - name: ask_open
+    examples:
+      - Open?
+      - Are you open?
+      - Are they open?
+      - Are you working right now?
+      - Do you work right now?
+dialog:
+  - condition: intents.ask_open
+    response: |
+      {% set local_time =  utc_time.astimezone("America/Toronto"|tz) %}
+      {% if local_time.isoweekday() in [1, 2, 3, 4, 5] and local_time.hour >= 10 and local_time.hour < 18 %}
+        We are open, welcome!
+      {% else %}
+        Now we are not woking.
+        We are open from 10 am to 6 pm every weekday.
+      {% endif %}
+  - condition: true
+    response: |
+      I didn't understand. You can try rephrasing.

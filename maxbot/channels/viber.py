@@ -4,11 +4,12 @@ from functools import cached_property
 from urllib.parse import urljoin
 
 import httpx
-from marshmallow import Schema, fields
 from viberbot.api.messages import PictureMessage
 from viberbot.api.messages.text_message import TextMessage
 from viberbot.api.viber_requests import ViberMessageRequest, create_request
 from viberbot.api.viber_requests.viber_request import ViberRequest
+
+from ..maxml import Schema, fields
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +150,7 @@ class ViberChannel:
         :param dict command: a command with the payload :attr:`~maxbot.schemas.CommandSchema.text`.
         :param dict dialog: a dialog we respond in, with the schema :class:`~maxbot.schemas.DialogSchema`
         """
-        await self._api.send_message(dialog["user_id"], TextMessage(text=command["text"]))
+        await self._api.send_message(dialog["user_id"], TextMessage(text=command["text"].render()))
 
     async def send_image(self, command: dict, dialog: dict):
         """Send an image command to the channel.
@@ -160,9 +161,12 @@ class ViberChannel:
         :param dict command: a command with the payload :attr:`~maxbot.schemas.CommandSchema.image`.
         :param dict dialog: a dialog we respond in, with the schema :class:`~maxbot.schemas.DialogSchema`
         """
+        caption = command["image"].get("caption")
         await self._api.send_message(
             dialog["user_id"],
-            PictureMessage(media=command["image"]["url"], text=command["image"].get("caption")),
+            PictureMessage(
+                media=command["image"]["url"], text=None if caption is None else caption.render()
+            ),
         )
 
     async def receive_text(self, request: ViberRequest):

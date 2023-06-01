@@ -11,19 +11,16 @@
       response: What day would you like to come in?
     - message: May 29, 2025
       response: |
-        Thursday, May 29 it is.
-
-        What time do you want the reservation to be made for?
+        <text>Thursday, May 29 it is.</text>
+        <text>What time do you want the reservation to be made for?</text>
     - message: at 5 pm
       response: |
-        Ok, the reservation is for 5:00 PM.
-
-        How many people will be dining?
+        <text>Ok, the reservation is for 5:00 PM.</text>
+        <text>How many people will be dining?</text>
     - message: "6"
       response: |
-        Ok. The reservation is for 6 guests.
-
-        I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?
+        <text>Ok. The reservation is for 6 guests.</text>
+        <text>I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?</text>
     - message: Please do.
       response: OK. I am making you a reservation for 6 on Thursday, May 29 at 5:00 PM.
 
@@ -33,19 +30,16 @@
       response: What day would you like to come in?
     - message: at 5 pm
       response: |
-        Ok, the reservation is for 5:00 PM.
-
-        What day would you like to come in?
+        <text>Ok, the reservation is for 5:00 PM.</text>
+        <text>What day would you like to come in?</text>
     - message: "6"
       response: |
-        Ok. The reservation is for 6 guests.
-
-        What day would you like to come in?
+        <text>Ok. The reservation is for 6 guests.</text>
+        <text>What day would you like to come in?</text>
     - message: May 29, 2025
       response: |
-        Thursday, May 29 it is.
-
-        I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?
+        <text>Thursday, May 29 it is.</text>
+        <text>I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?</text>
     - message: Please do.
       response: OK. I am making you a reservation for 6 on Thursday, May 29 at 5:00 PM.
 
@@ -55,9 +49,8 @@
       response: How many people will be dining?
     - message: "6"
       response: |
-        Ok. The reservation is for 6 guests.
-
-        I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?
+        <text>Ok. The reservation is for 6 guests.</text>
+        <text>I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?</text>
     - message: Please do.
       response: OK. I am making you a reservation for 6 on Thursday, May 29 at 5:00 PM.
 
@@ -69,9 +62,8 @@
       response: How many people will be dining?
     - message: "6"
       response: |
-        Ok. The reservation is for 6 guests.
-
-        I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?
+        <text>Ok. The reservation is for 6 guests.</text>
+        <text>I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?</text>
     - message: Please do.
       response: OK. I am making you a reservation for 6 on Thursday, May 29 at 5:00 PM.
 
@@ -90,9 +82,8 @@
       response: How many people will be dining?
     - message: "0"
       response: |
-        Please specify a number that is larger than 0.
-
-        How many people will be dining?
+        <text>Please specify a number that is larger than 0.</text>
+        <text>How many people will be dining?</text>
 
 - name: confirmation-not-found
   turns:
@@ -109,9 +100,8 @@
       response: I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?
     - message: Change the reservation time to 6pm
       response: |
-        Ok, the reservation is for 6:00 PM.
-
-        I'm going to reserve you a table for 6 on Thursday, May 29 at 6:00 PM. Should I go ahead?
+        <text>Ok, the reservation is for 6:00 PM.</text>
+        <text>I'm going to reserve you a table for 6 on Thursday, May 29 at 6:00 PM. Should I go ahead?</text>
 
 - name: confirmation-reply-no
   turns:
@@ -119,9 +109,8 @@
       response: I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?
     - message: Please don't.
       response: |
-        Alright. Let's start over. I'll try to keep up this time.
-
-        What day would you like to come in?
+        <text>Alright. Let's start over. I'll try to keep up this time.</text>
+        <text>What day would you like to come in?</text>
 
 - name: guests-previous-value
   turns:
@@ -129,9 +118,8 @@
       response: I'm going to reserve you a table for 6 on Thursday, May 29 at 5:00 PM. Should I go ahead?
     - message: Change the number of persons to 7
       response: |
-        Ok, updating the number of guests from 6 to 7.
-
-        I'm going to reserve you a table for 7 on Thursday, May 29 at 5:00 PM. Should I go ahead?
+        <text>Ok, updating the number of guests from 6 to 7.</text>
+        <text>I'm going to reserve you a table for 7 on Thursday, May 29 at 5:00 PM. Should I go ahead?</text>
 
 - name: confirmation-slot-in-focus
   turns:
@@ -148,17 +136,15 @@
       response: What day would you like to come in?
     - message: Nevermind
       response: |
-        Ok, we'll stop there. No reservation will be made.
-
-        I look forward to helping you with your next reservation. Have a good day.
+        <text>Ok, we'll stop there. No reservation will be made.</text>
+        <text>I look forward to helping you with your next reservation. Have a good day.</text>
 
 - name: time-retry-counter
   turns:
     - message: i'd like to make a reservation on May 29, 2025
       response: |
-        Thursday, May 29 it is.
-
-        What time do you want the reservation to be made for?
+        <text>Thursday, May 29 it is.</text>
+        <text>What time do you want the reservation to be made for?</text>
     - message: orange
       response: |
         Please specify the time that you want to eat.
@@ -169,6 +155,5 @@
         The restaurant seats people between 9AM and 9PM.
     - message: purple
       response: |
-        You seem to be having trouble choosing a time. I will make the reservation at 8PM for you.
-
-        How many people will be dining?
+        <text>You seem to be having trouble choosing a time. I will make the reservation at 8PM for you.</text>
+        <text>How many people will be dining?</text>

@@ -2,9 +2,8 @@
 import logging
 from functools import cached_property
 
-from marshmallow import Schema, fields, validate
-
 from ..errors import BotError, YamlSnippet
+from ..maxml import Schema, fields, validate
 from ..scenarios import ExpressionField, ScenarioField
 from ..schemas import MaxmlSchema, ResourceSchema
 from ._base import DigressionResult, FlowComponent, FlowResult
@@ -121,19 +120,11 @@ class DialogNodeSchema(ResourceSchema):
     def _load_one(self, data, **kwargs):
         if not isinstance(data, dict):
             raise BotError("Invalid input type", YamlSnippet.from_data(data))
-        for type_schema in (
-            NodeSchema,
-            SubtreeRefSchema,
-        ):
-            for field_name in [
-                n
-                for n, t in type_schema._declared_fields.items()  # pylint: disable=W0212
-                if t.required
-            ]:
+        for schema in (NodeSchema(), SubtreeRefSchema()):
+            for field_name in [n for n, t in schema.declared_fields.items() if t.required]:
                 if field_name not in data:
                     break
             else:
-                schema = type_schema()
                 schema.context.update(getattr(self, "context", {}))
                 return schema.load(data, many=False, **kwargs)
         raise BotError("Unknown node type", YamlSnippet.from_data(data))
@@ -443,7 +434,7 @@ class Turn:
         :raise ValueError: Unknown slot filling result.
         :return FlowResult: The result of the turn of the flow.
         """
-        logger.debug("trigger node %s", node)
+        self.journal_event("node_triggered", node)
         if node.slot_filling:
             result = await node.slot_filling(self.ctx, digression_result)
             if result == FlowResult.DONE:
@@ -464,19 +455,44 @@ class Turn:
         :param DigressionResult digression_result: The result with which we return from digression.
         :return FlowResult: The result of the turn of the flow.
         """
+        payload = self.journal_event("response", node)
         for command in await node.response(self.ctx, returning=digression_result is not None):
             if "jump_to" in command:
+                payload.update(control_command="jump_to")
                 return await self.command_jump_to(node, command["jump_to"])
             if "listen" in command:
+                payload.update(control_command="listen")
                 return await self.command_listen(node)
             if "end" in command:
+                payload.update(control_command="end")
                 return self.command_end()
             if "followup" in command:
+                payload.update(control_command="followup")
                 return await self.command_followup(node)
             self.ctx.commands.append(command)
         if node.followup:
+            payload.update(followup={})
             return await self.command_listen(node)
-        return await self.return_after_digression() or self.command_end()
+        result = await self.return_after_digression()
+        if result:
+            payload.update(return_after_digression={})
+        else:
+            payload.update(end={})
+            result = self.command_end()
+        return result
+
+    def journal_event(self, event_type, node, payload=None):
+        """Add journal event.
+
+        :param str event_type: Type of the event.
+        :param Node node: Traget node.
+        :param dict payload: Additional payload (optinal).
+        """
+        payload = payload or {}
+        payload["node"] = {"condition": node.condition.source}
+        if node.label:
+            payload["node"].update(label=node.label)
+        return self.ctx.journal_event(event_type, payload)
 
 
 class Tree:

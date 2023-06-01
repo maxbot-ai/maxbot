@@ -87,10 +87,10 @@ The schema supports most widely used command types in a platform-independent way
 
 #### Attributes
 
-| Name           | Type                                   | Description |
-| -----------    | ----------- 	                          | ----------- |
-| `text`         | [String](/design-reference/strings.md) | Text command. |
-| `image`        | [ImageCommand](#imagecommand)          | Image command. |
+| Name           | Type                                        | Description |
+| -----------    | ----------- 	                               | ----------- |
+| `text`         | [Markup](/design-guides/maxml.md#markup) | Text command. |
+| `image`        | [ImageCommand](#imagecommand)               | Image command. |
 
 #### Examples
 
@@ -159,10 +159,10 @@ An image command payload.
 
 #### Attributes
 
-| Name          | Type                                   | Maxml     | Description |
-| -----------   | ----------- 	                         | --------- | ----------- |
-| `url`\*       | [String](/design-reference/strings.md) | attribute | HTTP URL to get a file from the Internet. |
-| `caption`     | [String](/design-reference/strings.md) | element   | Caption of the image to be sent. |
+| Name          | Type                                     | [Maxml metadata](/design-guides/maxml.md#metadata) | Description |
+| -----------   | ----------- 	                           | ---------                                          | ----------- |
+| `url`\*       | [String](/design-reference/strings.md)   | attribute                                          | HTTP URL to get a file from the Internet. |
+| `caption`     | [Markup](/design-guides/maxml.md#markup) | element                                            | Caption of the image to be sent. |
 
 
 #### Examples

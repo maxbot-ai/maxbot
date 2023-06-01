@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
 
 import pytest
-from marshmallow import Schema, fields, validate
 
 from maxbot.context import TurnContext
 from maxbot.errors import BotError
+from maxbot.maxml import Schema, fields, validate
 from maxbot.scenarios import Expression, ExpressionField, ScenarioField, Template
 from maxbot.schemas import MaxmlSchema, ResourceSchema
 
@@ -146,7 +146,7 @@ async def test_validation_error():
         await template(ctx)
     assert str(excinfo.value) == (
         "caused by marshmallow.exceptions.ValidationError: Not a valid integer.\n"
-        '  in "<Markdown document>", line 1:\n'
+        '  in "<Xml document>", line 1, column 1:\n'
         "    <i>not a int</i>\n"
         "    ^^^\n"
     )
@@ -165,7 +165,7 @@ async def test_validation_error_validate():
         await template(ctx)
     assert str(excinfo.value) == (
         "caused by marshmallow.exceptions.ValidationError: Length must be between 10 and 20.\n"
-        '  in "<Markdown document>", line 2:\n'
+        '  in "<Xml document>", line 2, column 1:\n'
         "    <c>\n"
         "    <l>text1</l>\n"
         "    ^^^\n"
@@ -187,24 +187,24 @@ async def test_validation_error_attr():
         await template(ctx)
     assert str(excinfo.value) == (
         "caused by marshmallow.exceptions.ValidationError: Not a valid list.\n"
-        '  in "<Markdown document>", line 1:\n'
+        '  in "<Xml document>", line 1, column 1:\n'
         '    <c l="" />\n'
         "    ^^^\n"
     )
 
 
 async def test_validation_markdown_image_url():
-    template = Template("p1\n\np2\n![](123)")
+    template = Template('p1\n\np2\n<image url="123" />')
     ctx = make_context()
     with pytest.raises(BotError) as excinfo:
         await template(ctx)
     assert str(excinfo.value) == (
         "caused by marshmallow.exceptions.ValidationError: Not a valid URL.\n"
-        '  in "<Markdown document>", line 4:\n'
+        '  in "<Xml document>", line 4, column 1:\n'
         "    p1\n"
         "\n"
         "    p2\n"
-        "    ![](123)\n"
+        '    <image url="123" />\n'
         "    ^^^\n"
     )
 

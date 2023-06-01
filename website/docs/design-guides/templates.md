@@ -11,7 +11,7 @@ This document describes the syntax and semantics of the Jinja template engine ta
 
 A template is simply a string that is interpreted by template engine. Special delimiters in the template allow you to write code using statements and expressions. When responding to a user, the template is passed user input and bot state to render the final response. You can use [context variables](/design-reference/context.md) to access all necessary information during template rendering.
 
-The templating engine is overlaid on a markdown document that is expected to be a reply of the bot.
+The templating engine is overlaid on a [XML document](maxml.md) that is expected to be a reply of the bot.
 
 Templates themselves has a few kinds of delimiters.
 
@@ -26,13 +26,6 @@ Include any context variable value in your response using the `{{ ... }}` print-
 ```yaml
 response: |
   Good day to you, {{ user.name }}!
-```
-
-The same way you can include variable into the [MAXML response](markdown.md#maxml).
-
-```yaml
-response: |
-  <text>Good day to you, {{ user.name }}!</text>
 ```
 
 If the user name is Norman, then in both cases the response that is displayed to user is

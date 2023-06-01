@@ -5,8 +5,7 @@ import inspect
 import pkgutil
 from abc import ABC, abstractmethod
 
-from marshmallow import Schema, fields
-
+from ..maxml import Schema, fields
 from ..schemas import ResourceSchema
 
 BUILTIN_CHANNELS = {

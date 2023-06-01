@@ -2,7 +2,9 @@
 import click
 import dotenv
 
+from .info import info as info_command
 from .run import run
+from .stories import stories as stories_command
 
 
 @click.group()
@@ -17,5 +19,7 @@ def main():
 
 
 main.add_command(run)
+main.add_command(stories_command)
+main.add_command(info_command)
 
 __all__ = ("main",)

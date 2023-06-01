@@ -104,11 +104,18 @@ Your bot returns a response with the image and text that you specified for the d
 
 ```yaml
 🧑 Tell me about the restaurant
-🤖 - image:
-       caption: |-
-         Truck Stop Gourmand is the brainchild of Gloria and Fred Smith. What started out as a food truck in 2004 has expanded into a thriving restaurant. We now have one brick-and-mortar restaurant in downtown Portland. The bigger kitchen brought with it new chefs, but each one is faithful to the philosophy that made the Smith food truck so popular to begin with deliver fresh, local produce in inventive and delicious ways.
-         Join us for lunch or dinner seven days a week. Or order a cake from our bakery.
-       url: https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg
+🤖 <image url="https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg" />
+   <text>
+     Truck Stop Gourmand is the brainchild of Gloria and Fred Smith.
+     What started out as a food truck in 2004 has expanded into a
+     thriving restaurant. We now have one brick-and-mortar restaurant
+     in downtown Portland. The bigger kitchen brought with it new chefs,
+     but each one is faithful to the philosophy that made the Smith food
+     truck so popular to begin with deliver fresh, local produce in
+     inventive and delicious ways.
+     Join us for lunch or dinner seven days a week. Or order a cake from
+     our bakery.
+   </text>
 ```
 
 Check the answer in your messenger. You will see and image and a text. With the folded string style, text that you split into lines for convenience is now merged onto a single line, except for those lines that are separated by a blank line.

@@ -8,6 +8,8 @@ from telegram.ext import Application
 
 import maxbot.cli
 from maxbot import MaxBot
+from maxbot.cli._journal import Dumper, FileJournal
+from maxbot.cli._rich import PrettyJournal
 from maxbot.dialog_manager import DialogManager
 
 
@@ -106,16 +108,15 @@ def test_journal_file(runner, botfile, tmp_path, monkeypatch):
             "run",
             "--bot",
             botfile,
-            "--journal",
-            f"file:{journal_file}",
+            "--journal-file",
+            f"{journal_file}",
         ],
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
 
     (journal,) = DialogManager.journal.call_args.args
-    assert journal.f.name == str(journal_file)
-    journal.f.close()
+    assert journal.chain[-1].f.name == str(journal_file)
 
 
 def test_journal_bad_file(runner, botfile, tmp_path):
@@ -128,20 +129,118 @@ def test_journal_bad_file(runner, botfile, tmp_path):
             "run",
             "--bot",
             botfile,
-            "--journal",
-            f"file:{badfile}",
+            "--journal-file",
+            f"{badfile}",
         ],
         catch_exceptions=False,
     )
     assert result.exit_code == 2, result.output
-    assert f"could not open '{badfile}'" in result.output
+    assert f"Invalid value for '--journal-file': {str(badfile)!r}: Is a directory" in result.output
 
 
-def test_journal_unknown(runner, botfile):
+@pytest.mark.parametrize(
+    "output, dumps", (("json", Dumper.json_line), ("yaml", Dumper.yaml_triple_dash))
+)
+def test_journal_output(runner, botfile, tmp_path, monkeypatch, output, dumps):
+    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(DialogManager, "journal", Mock())
+
+    journal_file = tmp_path / "maxbot.jsonl"
+
     result = runner.invoke(
         maxbot.cli.main,
-        ["run", "--bot", botfile, "--no-reload", "--journal", "unknown"],
+        ["run", "--bot", botfile, "--journal-file", f"{journal_file}", "--journal-output", output],
         catch_exceptions=False,
     )
-    assert result.exit_code == 2, result.output
-    assert "unknown journal 'unknown'" in result.output
+    assert result.exit_code == 0, result.output
+
+    (journal,) = DialogManager.journal.call_args.args
+    assert journal.chain[-1].dumps == dumps
+
+
+def test_no_journal(runner, botfile, monkeypatch):
+    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(DialogManager, "journal", Mock())
+
+    result = runner.invoke(
+        maxbot.cli.main,
+        [
+            "run",
+            "--bot",
+            botfile,
+            "-q",
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    (journal,) = DialogManager.journal.call_args.args
+    assert not journal.chain
+
+
+def test_console_journal_only(runner, botfile, monkeypatch):
+    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(DialogManager, "journal", Mock())
+
+    result = runner.invoke(
+        maxbot.cli.main,
+        [
+            "run",
+            "--bot",
+            botfile,
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    (journal,) = DialogManager.journal.call_args.args
+    (console_journal,) = journal.chain
+    assert isinstance(console_journal, PrettyJournal)
+
+
+def test_file_journal_only(runner, botfile, tmp_path, monkeypatch):
+    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(DialogManager, "journal", Mock())
+
+    journal_file = tmp_path / "maxbot.jsonl"
+
+    result = runner.invoke(
+        maxbot.cli.main,
+        [
+            "run",
+            "--bot",
+            botfile,
+            "-q",
+            "--journal-file",
+            f"{journal_file}",
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    (journal,) = DialogManager.journal.call_args.args
+    (file_journal,) = journal.chain
+    assert isinstance(file_journal, FileJournal)
+
+
+def test_console_and_file_journal(runner, botfile, tmp_path, monkeypatch):
+    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(DialogManager, "journal", Mock())
+
+    journal_file = tmp_path / "maxbot.jsonl"
+
+    result = runner.invoke(
+        maxbot.cli.main,
+        [
+            "run",
+            "--bot",
+            botfile,
+            "--journal-file",
+            f"{journal_file}",
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+
+    (journal,) = DialogManager.journal.call_args.args
+    assert len(journal.chain) == 2

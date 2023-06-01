@@ -28,13 +28,13 @@ test:
 	pytest --cov=maxbot --cov-report html --cov-fail-under=95
 
 stories:
-	python examples/stories.py examples/hello-world
-	python examples/stories.py examples/echo
-	python examples/stories.py examples/restaurant
-	python examples/stories.py examples/reservation-basic
-	python examples/stories.py examples/reservation
-	python examples/stories.py examples/digression-showcase
-	python examples/stories.py examples/rpc-showcase
+	maxbot stories -B examples/hello-world
+	maxbot stories -B examples/echo
+	maxbot stories -B examples/restaurant
+	maxbot stories -B examples/reservation-basic
+	maxbot stories -B examples/reservation
+	maxbot stories -B examples/digression-showcase
+	maxbot stories -B examples/rpc-showcase
 
 clean:
 	rm -f dist/maxbot-*.*.*-py3-none-any.whl

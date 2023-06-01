@@ -54,7 +54,17 @@ async def test_invalid_command(ctx):
     """
     )
     await df.turn(ctx)
-    assert "'custom' command not found" in ctx.error.message
+    assert str(ctx.error) == (
+        "caused by maxbot.maxml.xml_parser._Error: Command 'custom' is not described in the schema\n"
+        '  in "<unicode string>", line 4, column 22:\n'
+        "    - condition: true\n"
+        '      response: <custom f="xxx" />\n'
+        "                ^^^\n"
+        "\n"
+        '  in "<Xml document>", line 1, column 1:\n'
+        '    <custom f="xxx" />\n'
+        "    ^^^\n"
+    )
 
 
 async def test_invalid_template(ctx):

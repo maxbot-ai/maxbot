@@ -5,9 +5,9 @@ from urllib.parse import urljoin
 import httpx
 from jinja2 import nodes
 from jinja2.ext import Extension
-from marshmallow import Schema, fields, validate
 
 from ..errors import BotError
+from ..maxml import Schema, fields, validate
 
 logger = logging.getLogger(__name__)
 

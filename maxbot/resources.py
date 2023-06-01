@@ -4,9 +4,8 @@ import importlib.resources
 import logging
 from pathlib import Path
 
-from marshmallow import fields
-
 from .errors import BotError
+from .maxml import fields
 from .schemas import ResourceSchema
 
 logger = logging.getLogger(__name__)

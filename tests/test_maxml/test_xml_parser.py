@@ -1,8 +1,9 @@
 import pytest
-from marshmallow import Schema, fields
 
+from maxbot.errors import BotError
+from maxbot.maxml import Schema, fields, markup
+from maxbot.maxml.xml_parser import Pointer, XmlParser, _ContentHandler, _Error, _ErrorHandler
 from maxbot.schemas import CommandSchema
-from maxbot.xml import XmlError, XmlParser, _ErrorHandler
 
 
 class _XmlError(Exception):
@@ -11,30 +12,29 @@ class _XmlError(Exception):
 
 
 def test_error_handler_error():
-    with pytest.raises(XmlError) as excinfo:
+    with pytest.raises(_Error) as excinfo:
         _ErrorHandler().error(_XmlError())
     assert excinfo.value.message == "_XmlError: pytest"
 
 
-def test_error_handler_warning():
+def test_content_handler_no_ptr():
+    assert _ContentHandler(None, None)._get_ptr() is None
+
+
+def test_error_handler_warning(caplog):
     _ErrorHandler().warning(_XmlError())
-
-
-def test_unexpected_root_element():
-    with pytest.raises(XmlError) as excinfo:
-        XmlParser().parse_paragraph("<test></test>", Schema, lambda v: None)
-    assert excinfo.value.message == "Unexpected root element: 'test'"
-
-
-def test_without_text_command():
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("content", Schema)
-    assert excinfo.value.message == "'text' command not found"
+    assert "XML warning" in caplog.text
 
 
 def test_empty_text():
     commands = _parse_xml("")
     assert commands == []
+
+
+def test_unknown_command():
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<unknown_command />")
+    assert "Command 'unknown_command' is not described in the schema" in excinfo.value.message
 
 
 def test_text():
@@ -64,76 +64,80 @@ def test_text_whitespace_normalization():
     assert command == {"text": "Line 1 Line 2\nLine 3\nLine 4"}
 
 
-@pytest.mark.parametrize("doc", ('<image url="{url}" />', '<img src="{url}" />'))
-def test_image(doc):
+def test_image():
     url = "http://localhost/image.png"
-    (command,) = _parse_xml(doc.format(url=url))
+    (command,) = _parse_xml(f'<image url="{url}" />')
     assert command == {"image": {"url": url}}
 
 
-@pytest.mark.parametrize(
-    "doc",
-    (
-        '<image url="{url}"><caption>{caption}</caption></image>',
-        '<img src="{url}" alt="{caption}" />',
-    ),
-)
-def test_image_with_caption(doc):
+def test_image_with_caption():
     url = "https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg"
     caption = "Hello, world!"
-    (command,) = _parse_xml(doc.format(url=url, caption=caption))
+    (command,) = _parse_xml(f'<image url="{url}"><caption>{caption}</caption></image>')
     assert command == {"image": {"url": url, "caption": caption}}
+
+
+def test_image_with_caption_markup():
+    url = "https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg"
+    (command,) = _parse_xml(f'<image url="{url}"><caption>Hello,<br />world!</caption></image>')
+    assert command == {"image": {"url": url, "caption": "Hello,\nworld!"}}
 
 
 @pytest.mark.parametrize("doc", ("<text>1</text></text>", "<text>"))
 def test_mismatched_tag(doc):
-    with pytest.raises(XmlError) as excinfo:
+    with pytest.raises(BotError) as excinfo:
         _parse_xml(doc)
-    assert excinfo.value.message == "SAXParseException: mismatched tag"
+    assert "SAXParseException: mismatched tag" in excinfo.value.message
 
 
 def test_duplicate_attribute():
-    with pytest.raises(XmlError) as excinfo:
+    with pytest.raises(BotError) as excinfo:
         _parse_xml('<image url="http://localhost/image1.png" url="http://localhost/image2.png" />')
-    assert excinfo.value.message == "SAXParseException: duplicate attribute"
+    assert "SAXParseException: duplicate attribute" in excinfo.value.message
 
 
 def test_attribute_without_quotes():
-    with pytest.raises(XmlError) as excinfo:
+    with pytest.raises(BotError) as excinfo:
         _parse_xml("<image url=https://github.com/maxbot-ai/misc/raw/main/food_1.jpg />")
-    assert excinfo.value.message == "SAXParseException: not well-formed (invalid token)"
+    assert "SAXParseException: not well-formed (invalid token)" in excinfo.value.message
 
 
 def test_br_with_child():
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<text><br><unexpected /></br></text>")
-    assert excinfo.value.message == "Element 'text' has undescribed child element 'unexpected'"
+    (command,) = _parse_xml("<text><br><unexpected /></br></text>")
+    command["text"].items == [
+        markup.Item(markup.START_TAG, "br"),
+        markup.Item(markup.START_TAG, "unexpected"),
+        markup.Item(markup.END_TAG, "unexpected"),
+        markup.Item(markup.END_TAG, "br"),
+    ]
 
 
 def test_br_with_attr():
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml('<text><br unexpected="xxx" /></text>')
-    assert excinfo.value.message == "Element 'br' has undescribed attributes {'unexpected': 'xxx'}"
+    (command,) = _parse_xml('<text><br unexpected="xxx" /></text>')
+    command["text"].items == [
+        markup.Item(markup.START_TAG, "br", {"unexpected": "xxx"}),
+        markup.Item(markup.END_TAG, "br"),
+    ]
 
 
 def test_unexpected_text():
     class CustomCommandSchema(Schema):
         test = fields.Nested(Schema)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<test>Hello world</test>", CustomCommandSchema)
-    assert excinfo.value.message == "Element 'test' has undescribed text"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<test>Hello world</test>", schema=CustomCommandSchema())
+    assert "Element 'test' has undescribed text" in excinfo.value.message
 
 
 def test_forbidden_field():
     class CustomCommandSchema(Schema):
         forbidden = fields.Dict()
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<forbidden />", CustomCommandSchema)
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<forbidden />", schema=CustomCommandSchema())
     assert (
-        excinfo.value.message
-        == "Unexpected schema (<class 'marshmallow.fields.Dict'>) for element 'forbidden'"
+        "Unexpected schema (<class 'marshmallow.fields.Dict'>) for element 'forbidden'"
+        in excinfo.value.message
     )
 
 
@@ -152,11 +156,11 @@ def test_list_of_scalar():
             "<button>case 1</button><button>case 2</button><button>case 3</button><button>case 4</button>"
             "</quick_reply>"
         ),
-        CustomCommandSchema,
+        schema=CustomCommandSchema(),
     )
     assert command == {
         "quick_reply": {
-            "caption": "Quick reply caption text",
+            "caption": "Quick reply\ncaption text",
             "button": ["case 1", "case 2", "case 3", "case 4"],
         },
     }
@@ -177,7 +181,7 @@ def test_list_one_element():
             "<button>case 1</button>\n"
             "</quick_reply>"
         ),
-        CustomCommandSchema,
+        schema=CustomCommandSchema(),
     )
     assert command == {
         "quick_reply": {
@@ -222,7 +226,7 @@ def test_list_complex():
             "</item>\n"
             "</carousel>"
         ),
-        CustomCommandSchema,
+        schema=CustomCommandSchema(),
     )
     assert command == {
         "carousel": {
@@ -244,26 +248,36 @@ def test_list_complex():
 
 
 def test_attribute_redefined_by_element():
-    with pytest.raises(XmlError) as excinfo:
+    with pytest.raises(BotError) as excinfo:
         _parse_xml('<image url="http://127.0.0.1"><url>http://127.0.0.2</url></image>')
-    assert excinfo.value.message == "Value 'url' already defined"
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Element 'url' is duplicated\n"
+        '  in "<Xml document>", line 1, column 31:\n'
+        '    <image url="http://127.0.0.1"><url>http://127.0.0.2</url></image>\n'
+        "                                  ^^^\n"
+    )
 
 
 def test_element_redefined_by_element():
-    with pytest.raises(XmlError) as excinfo:
+    with pytest.raises(BotError) as excinfo:
         _parse_xml(
             '<image url="http://127.0.0.1"><caption>1</caption><caption>2</caption></image>'
         )
-    assert excinfo.value.message == "Value 'caption' already defined"
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Element 'caption' is duplicated\n"
+        '  in "<Xml document>", line 1, column 51:\n'
+        '    <image url="http://127.0.0.1"><caption>1</caption><caption>2</caption></image>\n'
+        "                                                      ^^^\n"
+    )
 
 
 def test_not_described():
     class CustomCommandSchema(Schema):
         command = fields.Nested(Schema)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<command><test /></command>", CustomCommandSchema)
-    assert excinfo.value.message == "Element 'test' is not described in the schema"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<command><test /></command>", schema=CustomCommandSchema())
+    assert "Element 'test' is not described in the schema" in excinfo.value.message
 
 
 def test_list_of_list_case1():
@@ -273,9 +287,9 @@ def test_list_of_list_case1():
     class CustomCommandSchema(Schema):
         command = fields.Nested(Command)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<command><test></test></command>", CustomCommandSchema)
-    assert excinfo.value.message == "The list ('test') should be a dictionary field"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<command><test></test></command>", schema=CustomCommandSchema())
+    assert "The list ('test') should be a dictionary field" in excinfo.value.message
 
 
 def test_list_of_list_case2():
@@ -288,9 +302,11 @@ def test_list_of_list_case2():
     class CustomCommandSchema(Schema):
         command = fields.Nested(Command1)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<command><test1><test2></test2></test1></command>", CustomCommandSchema)
-    assert excinfo.value.message == "The list ('test1') should be a dictionary field"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml(
+            "<command><test1><test2></test2></test1></command>", schema=CustomCommandSchema()
+        )
+    assert "The list ('test1') should be a dictionary field" in excinfo.value.message
 
 
 def test_list_of_nested():
@@ -313,7 +329,7 @@ def test_list_of_nested():
             "<test1><test2><test3>2</test3></test2></test1>\n"
             "</command>"
         ),
-        CustomCommandSchema,
+        schema=CustomCommandSchema(),
     )
     assert command == {
         "command": {"test1": [{"test2": {"test3": "1"}}, {"test2": {"test3": "2"}}]}
@@ -328,29 +344,31 @@ def test_text_command_with_attribute():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    (command,) = _parse_xml('<message to="operator">Hello</message>', CustomCommandSchema)
+    (command,) = _parse_xml('<message to="operator">Hello</message>', schema=CustomCommandSchema())
     assert command == {"message": {"text": "Hello", "to": "operator"}}
 
 
 def test_text_with_attrs():
-    with pytest.raises(XmlError) as excinfo:
+    with pytest.raises(BotError) as excinfo:
         _parse_xml('<text url="http://127.0.0.1">1</text>')
-    assert (
-        excinfo.value.message
-        == "Element 'text' has undescribed attributes {'url': 'http://127.0.0.1'}"
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Attribute 'url' is not described in the schema\n"
+        '  in "<Xml document>", line 1, column 1:\n'
+        '    <text url="http://127.0.0.1">1</text>\n'
+        "    ^^^\n"
     )
 
 
-def test_content_field_text_normalization():
+def test_content_field_markup():
     class Message(Schema):
-        text = fields.String(required=True, metadata={"maxml": "content"})
+        text = markup.Field(required=True, metadata={"maxml": "content"})
 
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
     (command,) = _parse_xml(
         ("<message>\n" "  line 1-1  \n" " line  1-2<br />\n" "line 2 \n" "</message>"),
-        CustomCommandSchema,
+        schema=CustomCommandSchema(),
     )
     assert command == {"message": {"text": "line 1-1 line 1-2\nline 2"}}
 
@@ -359,7 +377,7 @@ def test_command_explicit_element():
     class CustomCommandSchema(Schema):
         message = fields.Str(metadata={"maxml": "element"})
 
-    (command,) = _parse_xml("<message>content</message>", CustomCommandSchema)
+    (command,) = _parse_xml("<message>content</message>", schema=CustomCommandSchema())
     assert command == {"message": "content"}
 
 
@@ -370,22 +388,27 @@ def test_command_explicit_element():
         "attribute",
     ),
 )
-def test_command_not_element(maxml):
+def test_command_not_element_on_load(maxml):
     class CustomCommandSchema(Schema):
         message = fields.Str(metadata={"maxml": maxml})
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<message />", CustomCommandSchema)
-    assert excinfo.value.message == "Command 'message' is not described as an element"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("", schema=CustomCommandSchema())
+    assert "Command 'message' is not described as an element" in excinfo.value.message
 
 
 def test_undescribed_attr():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Schema)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml('<message attr="" />', CustomCommandSchema)
-    assert excinfo.value.message == "Field 'attr' is not described in the schema"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml('<message attr="" />', schema=CustomCommandSchema())
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Attribute 'attr' is not described in the schema\n"
+        '  in "<Xml document>", line 1, column 1:\n'
+        '    <message attr="" />\n'
+        "    ^^^\n"
+    )
 
 
 @pytest.mark.parametrize(
@@ -402,9 +425,14 @@ def test_attr_maxml_mismatch(maxml):
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml('<message attr="" />', CustomCommandSchema)
-    assert excinfo.value.message == "Field 'attr' is not described as an attribute"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml('<message attr="" />', schema=CustomCommandSchema())
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Attribute 'attr' is not described in the schema\n"
+        '  in "<Xml document>", line 1, column 1:\n'
+        '    <message attr="" />\n'
+        "    ^^^\n"
+    )
 
 
 def test_child_default_attribute():
@@ -414,7 +442,7 @@ def test_child_default_attribute():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    (command,) = _parse_xml('<message field="val" />', CustomCommandSchema)
+    (command,) = _parse_xml('<message field="val" />', schema=CustomCommandSchema())
     assert command == {"message": {"field": "val"}}
 
 
@@ -425,7 +453,7 @@ def test_child_default_element_list():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    (command,) = _parse_xml("<message><field>val</field></message>", CustomCommandSchema)
+    (command,) = _parse_xml("<message><field>val</field></message>", schema=CustomCommandSchema())
     assert command == {"message": {"field": ["val"]}}
 
 
@@ -436,20 +464,26 @@ def test_child_default_element_dict():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    (command,) = _parse_xml("<message><field /></message>", CustomCommandSchema)
+    (command,) = _parse_xml("<message><field /></message>", schema=CustomCommandSchema())
     assert command == {"message": {"field": {}}}
 
 
-def test_element_maxml_mismatch():
+@pytest.mark.parametrize("metadata", (None, {"maxml": "attribute"}))
+def test_element_maxml_mismatch(metadata):
     class Message(Schema):
-        field = fields.Str(metadata={"maxml": "attribute"})
+        field = fields.Str(metadata=metadata)
 
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<message><field /></message>", CustomCommandSchema)
-    assert excinfo.value.message == "Field 'field' is not described as an element"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<message><field /></message>", schema=CustomCommandSchema())
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Element 'field' is not described in the schema\n"
+        '  in "<Xml document>", line 1, column 10:\n'
+        "    <message><field /></message>\n"
+        "             ^^^\n"
+    )
 
 
 def test_element_maxml_content():
@@ -459,14 +493,19 @@ def test_element_maxml_content():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<message><field /></message>", CustomCommandSchema)
-    assert excinfo.value.message == "Element 'message' has undescribed child element 'field'"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<message><field /></message>", schema=CustomCommandSchema())
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Element 'field' is not described in the schema\n"
+        '  in "<Xml document>", line 1, column 10:\n'
+        "    <message><field /></message>\n"
+        "             ^^^\n"
+    )
 
 
-def test_list_field_text_normalization():
+def test_list_field_markup():
     class Message(Schema):
-        line = fields.List(fields.String())
+        line = fields.List(markup.Field())
 
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
@@ -481,7 +520,7 @@ def test_list_field_text_normalization():
             "</line>\n"
             "</message>"
         ),
-        CustomCommandSchema,
+        schema=CustomCommandSchema(),
     )
     assert command == {"message": {"line": ["line 1-1 line 1-2\nline 2"]}}
 
@@ -495,11 +534,11 @@ def test_content_error_child_element():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<message></message>", CustomCommandSchema)
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<message></message>", schema=CustomCommandSchema())
     assert (
-        excinfo.value.message
-        == "An 'message' element with a 'field' content field cannot contain child elements: 'child1', 'child2'"
+        "An 'message' element with a 'field' content field cannot contain child elements: 'child1', 'child2'"
+        in excinfo.value.message
     )
 
 
@@ -510,9 +549,9 @@ def test_content_error_must_be_scalar():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<message></message>", CustomCommandSchema)
-    assert excinfo.value.message == "Field 'field' must be a scalar"
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<message></message>", schema=CustomCommandSchema())
+    assert "Field 'field' must be a scalar" in excinfo.value.message
 
 
 def test_content_error_more_than_one():
@@ -523,37 +562,66 @@ def test_content_error_more_than_one():
     class CustomCommandSchema(Schema):
         message = fields.Nested(Message)
 
-    with pytest.raises(XmlError) as excinfo:
-        _parse_xml("<message></message>", CustomCommandSchema)
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<message></message>", schema=CustomCommandSchema())
     assert (
-        excinfo.value.message
-        == "There can be no more than one field marked `content`: 'field1', 'field2'"
+        "There can be no more than one field marked `content`: 'field1', 'field2'"
+        in excinfo.value.message
     )
 
 
 @pytest.mark.parametrize(
-    "doc,lineno",
+    "doc,lineno,column",
     (
-        ("<text></test>", 0),
-        ("<text>\n</test>", 1),
-        ("<image\nnurl=https://127.0.0.1\n/>", 1),
-        ("\n<unknown_command />", 1),
+        ("<text></test>", 0, 8),
+        ("<text>\n</test>", 1, 2),
+        ("<image\nurl=https://127.0.0.1\n/>", 1, 4),
     ),
 )
-def test_xml_error_lineno(doc, lineno):
-    with pytest.raises(XmlError) as excinfo:
+def test_xml_error_ptr(doc, lineno, column):
+    with pytest.raises(BotError) as excinfo:
         _parse_xml(doc)
 
-    assert excinfo.value.lineno == lineno
+    (snippet,) = excinfo.value.snippets
+    assert snippet.line == lineno, excinfo.value.message
+    assert snippet.column == column, excinfo.value.message
+
+
+def test_xml_custom_markup():
+    class Message(Schema):
+        field = markup.Field(metadata={"maxml": "content"})
+
+    class CustomCommandSchema(Schema):
+        message = fields.Nested(Message)
+
+    (command,) = _parse_xml("<message><br /></message>", schema=CustomCommandSchema())
+    assert command == {"message": {"field": "\n"}}
+
+
+def test_xml_error_unexpected_element_str_content():
+    class Message(Schema):
+        field = fields.Str(metadata={"maxml": "content"})
+
+    class CustomCommandSchema(Schema):
+        message = fields.Nested(Message)
+
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml("<message><br /></message>", schema=CustomCommandSchema())
+    assert str(excinfo.value) == (
+        "caused by maxbot.maxml.xml_parser._Error: Element 'br' is not described in the schema\n"
+        '  in "<Xml document>", line 1, column 10:\n'
+        "    <message><br /></message>\n"
+        "             ^^^\n"
+    )
+
+
+def test_xml_error_unexpected_element_nested():
+    with pytest.raises(BotError) as excinfo:
+        _parse_xml('<image url="http://127.0.0.1"><br /></image>')
+    assert "Element 'br' is not described in the schema" in excinfo.value.message
 
 
 def test_regiter_symbol():
-    symbols = []
-
-    def register_symbol(value, lineno):
-        assert value != ""
-        symbols.append([value, lineno])
-
     doc = """first
 line
         <text>value 1</text>
@@ -564,16 +632,20 @@ line
 last
 line
     """
-    _parse_xml(doc, register_symbol=register_symbol)
-    assert symbols == [
-        ["first line", 0],
-        ["value 1", 2],
-        ["https://127.0.0.1", 3],
-        ["image caption", 5],
-        [{"url": "https://127.0.0.1", "caption": "image caption"}, 3],
-        ["last line", 7],
-    ]
+    symbols = {}
+    c1, c2, c3, c4 = _parse_xml(doc, symbols=symbols)
+    assert symbols[id(c1["text"])] == Pointer(0, 0)
+    assert symbols[id(c2["text"])] == Pointer(2, 8)
+    assert symbols[id(c3["image"])] == Pointer(3, 8)
+    assert symbols[id(c3["image"]["url"])] == Pointer(3, 8)
+    assert symbols[id(c3["image"]["caption"])] == Pointer(5, 12)
+    assert symbols[id(c4["text"])] == Pointer(7, 0)
 
 
-def _parse_xml(doc, schema=CommandSchema, register_symbol=lambda *_: None):
-    return XmlParser().parse_paragraph(f"<p>{doc}</p>", schema, register_symbol)
+def test_escaped_quotation():
+    (command,) = _parse_xml("&#34;")
+    command = {"text": '"'}
+
+
+def _parse_xml(doc, schema=CommandSchema(), symbols=None):
+    return XmlParser().loads(doc, maxml_command_schema=schema, maxml_symbols=symbols)

@@ -228,7 +228,7 @@ You might not want the dialog to return to where it left off, especially, if the
       examples:
         - Do you have cupcakes?
         - Do you serve cupcakes?
-        - Сan I order cupcakes from you?
+        - Can I order cupcakes from you?
         - Are there cupcakes on the menu?
     - name: about_flavors
       examples:

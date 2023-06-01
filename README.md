@@ -34,8 +34,8 @@
 For detailed installation instructions, see the
 [documentation](https://maxbot.ai/getting-started/installation).
 
-- **Operating system**: macOS / OS X · Linux
-- **Python version**: Python 3.9 (only 64 bit)
+- **Operating system**: macOS / OS X · Unix/Linux · Windows
+- **Python version**: Python 3.9-3.11 (only 64 bit)
 - **Package managers**: [pip](https://pypi.org/project/maxbot/)
 
 ### Pip
@@ -146,7 +146,4 @@ The **Maxbot** project is maintained by the [Maxbot team](https://maxbot.ai).
 
 - Integration of deterministic dialog models (Dialog Tree, Slot Filling) with large language models (LLM) such as ChatGPT, LLaMA, etc.
 - Improved debugging and logging tools.
-- Switch from Markdown to command language (XML-based) in bot response scripts.
-- Improved built-in date and time extensions.
 - Released new examples of using the library to create complex bots.
-- Support for Python 3.10, 3.11.

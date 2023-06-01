@@ -1,11 +1,22 @@
-"""Builtin MaxBot extension: date/time utils and `now` global variable."""
-from datetime import date, datetime, time
+"""Builtin MaxBot extension: date/time convertors."""
+from datetime import date, datetime, time, timezone
 
-import dateutil.parser
-from marshmallow import Schema, fields
-from pytz import timezone
+from dateutil.parser import parse
+from dateutil.tz import gettz
 
 from ..errors import BotError
+
+
+def tz_filter(name):
+    """Retrieve a time zone object from a string representation.
+
+    :param str name: A time zone name.
+    :return tzinfo:
+    """
+    tz = gettz(name)
+    if tz is None:
+        raise BotError(f"Unknown timezone: {name!r}")
+    return tz
 
 
 def datetime_filter(value):
@@ -15,17 +26,22 @@ def datetime_filter(value):
     :raise BotError: Could not convert input value to `datetime`.
     :return datetime:
     """
+    result = _datetime_filter_impl(value)
+    return result.replace(tzinfo=timezone.utc) if result.tzinfo is None else result
+
+
+def _datetime_filter_impl(value):
     if isinstance(value, datetime):
         return value
     if isinstance(value, date):
         return datetime.combine(value, datetime.min.time())
     if isinstance(value, time):
-        return datetime.combine(datetime.now(), value)
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value)
+        return datetime.combine(datetime.now(value.tzinfo), value)
     try:
-        return dateutil.parser.parse(value)
-    except (dateutil.parser.ParserError, OverflowError) as error:
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(value, tz=timezone.utc)
+        return parse(value)
+    except (OverflowError, ValueError) as error:
         raise BotError(f"Could not convert {value!r} to datetime: {error}") from error
 
 
@@ -53,19 +69,14 @@ def time_filter(value):
     """
     if not isinstance(value, datetime):
         if isinstance(value, time):
-            return value
+            return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
         if isinstance(value, date):
             raise BotError(f"Could not convert {value!r} to time")
-    return datetime_filter(value).time()
+    return datetime_filter(value).timetz()
 
 
 class DatetimeExtension:
     """Extension class."""
-
-    class ConfigSchema(Schema):
-        """Extension configuration schema."""
-
-        tz = fields.Str()
 
     def __init__(self, builder, config):
         """Extension entry point.
@@ -73,14 +84,7 @@ class DatetimeExtension:
         :param BotBuilder builder: MaxBot builder.
         :param dict config: Extension configuration.
         """
-        tz = config.get("tz")
-        self.timezone = timezone(tz) if tz else None
-        builder.before_turn(self._before_turn)
+        builder.add_template_filter(tz_filter, "tz")
         builder.add_template_filter(datetime_filter, "datetime")
         builder.add_template_filter(date_filter, "date")
         builder.add_template_filter(time_filter, "time")
-
-    def _before_turn(self, ctx):
-        dt = datetime.now(self.timezone)
-        ctx.scenario.now = dt
-        ctx.scenario.today = dt.date()

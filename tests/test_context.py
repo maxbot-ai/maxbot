@@ -6,7 +6,6 @@ from maxbot.context import (
     EntitiesProxy,
     EntitiesResult,
     IntentsResult,
-    LogRecord,
     RecognizedEntity,
     RecognizedIntent,
     RpcContext,
@@ -228,10 +227,24 @@ def test_rpc_context_empty():
 def test_log_debug():
     ctx = TurnContext(dialog=None, message={"text": "hello world"})
     ctx.debug("foo bar")
-    assert ctx.logs == [LogRecord("DEBUG", "foo bar")]
+    assert ctx.journal_events == [
+        {"type": "log", "payload": {"level": "DEBUG", "message": "foo bar"}}
+    ]
 
 
 def test_log_warning():
     ctx = TurnContext(dialog=None, message={"text": "hello world"})
     ctx.warning("foo bar")
-    assert ctx.logs == [LogRecord("WARNING", "foo bar")]
+    assert ctx.journal_events == [
+        {"type": "log", "payload": {"level": "WARNING", "message": "foo bar"}}
+    ]
+
+
+def test_utc_time():
+    ctx = TurnContext(dialog=None, message={"text": "hello world"})
+    assert ctx.create_scenario_context({})["utc_time"] == ctx.utc_time
+
+
+def test_today():
+    ctx = TurnContext(dialog=None, message={"text": "hello world"})
+    assert ctx.create_scenario_context({})["utc_today"] == ctx.utc_time.date()

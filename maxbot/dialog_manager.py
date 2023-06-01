@@ -1,7 +1,7 @@
 """MaxBot dialog."""
 import logging
 
-from .context import RpcContext, RpcRequest, TurnContext
+from .context import RpcContext, RpcRequest, TurnContext, get_utc_time_default
 from .flows.dialog_flow import DialogFlow
 from .resources import InlineResources
 from .rpc import RpcManager
@@ -25,7 +25,6 @@ class DialogManager:
         """Create new class instance.
 
         :param Nlu nlu: NLU component.
-        :param jinja2.Environment jinja_env: Jinja environment.
         :param RpcManager rpc: RPC manager.
         :param type dialog_schema: A schema class for dialog informatin.
         :param type message_schema: A schema class for user message.
@@ -39,6 +38,8 @@ class DialogManager:
         self.rpc = rpc or RpcManager()
         self._journal_logger = logging.getLogger("maxbot.journal")
         self._journal = self.default_journal
+        self.utc_time_provider = get_utc_time_default
+        self._dialog_is_ready = False
         self._dialog_is_ready = False
 
     @property
@@ -87,8 +88,17 @@ class DialogManager:
         logger.debug("process message %s, %s", message, dialog)
         message = self.MessageSchema().load(message)
         dialog = self.DialogSchema().load(dialog)
-        intents, entities = await self.nlu(message)
-        ctx = TurnContext(dialog, state, message=message, intents=intents, entities=entities)
+        utc_time = self.utc_time_provider()
+        intents, entities = await self.nlu(message, utc_time=utc_time)
+        ctx = TurnContext(
+            dialog,
+            state,
+            utc_time,
+            message=message,
+            intents=intents,
+            entities=entities,
+            command_schema=self.CommandSchema(many=True),
+        )
         await self.dialog_flow.turn(ctx)
         self._journal(ctx)
         return ctx.commands
@@ -110,7 +120,13 @@ class DialogManager:
         logger.debug("process rpc %s, %s", request, dialog)
         dialog = self.DialogSchema().load(dialog)
         request = self.rpc.parse_request(request)
-        ctx = TurnContext(dialog, state, rpc=RpcContext(RpcRequest(**request)))
+        ctx = TurnContext(
+            dialog,
+            state,
+            self.utc_time_provider(),
+            rpc=RpcContext(RpcRequest(**request)),
+            command_schema=self.CommandSchema(many=True),
+        )
         await self.dialog_flow.turn(ctx)
         self._journal(ctx)
         return ctx.commands
@@ -120,10 +136,12 @@ class DialogManager:
 
         :param TurnContext ctx: Turn context.
         """
-        for record in ctx.logs:
-            level = getattr(logging, record.level)
-            if self._journal_logger.isEnabledFor(level):
-                self._journal_logger.log(level, record.message)
+        for event in ctx.journal_events:
+            level, message = TurnContext.extract_log_event(event)
+            if isinstance(logging.getLevelName(level), int):
+                level = getattr(logging, level)
+                if self._journal_logger.isEnabledFor(level):
+                    self._journal_logger.log(level, message)
         if ctx.error:
             raise ctx.error
 

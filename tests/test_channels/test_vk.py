@@ -1,6 +1,6 @@
 import json
 import logging
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from sanic import Sanic
@@ -105,8 +105,10 @@ async def test_create_dialog(bot, dialog):
 async def test_send_text(bot, dialog, respx_mock):
     respx_mock.post(f"{API_URL}/messages.send").respond(json={"response": 1})
 
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
     await bot.channels.vk.call_senders(
-        command={"text": MESSAGE_TEXT},
+        command={"text": text},
         dialog=dialog,
     )
 
@@ -124,8 +126,10 @@ async def test_send_text(bot, dialog, respx_mock):
 
 async def test_send_text_error(bot, dialog, respx_mock):
     respx_mock.post(f"{API_URL}/messages.send").respond(json={"error": "error_code"})
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
     with pytest.raises(RuntimeError):
-        await bot.channels.vk.call_senders({"text": MESSAGE_TEXT}, dialog)
+        await bot.channels.vk.call_senders({"text": text}, dialog)
 
 
 async def test_receive_text(bot):
@@ -167,7 +171,9 @@ async def test_send_image(bot, dialog, url, headers, respx_mock):
     )
     respx_mock.post(f"{API_URL}/messages.send").respond(json={"response": 1})
 
-    await bot.channels.vk.call_senders({"image": {"url": url, "caption": MESSAGE_TEXT}}, dialog)
+    caption = Mock()
+    caption.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.vk.call_senders({"image": {"url": url, "caption": caption}}, dialog)
 
     request = respx_mock.calls[0].request
     assert str(request.url) == url

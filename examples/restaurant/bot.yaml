@@ -93,7 +93,7 @@ entities:
 dialog:
   - condition: intents.about_restaurant
     response: |
-        ![](https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg)
+        <image url="https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg" />
 
         Truck Stop Gourmand is the brainchild of Gloria and Fred Smith.
         What started out as a food truck in 2004 has expanded into a

@@ -1,6 +1,6 @@
 import json
 import logging
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from sanic import Sanic
@@ -99,7 +99,9 @@ async def test_create_dialog_no_recipient(bot, dialog):
 
 async def test_send_text(bot, dialog, respx_mock):
     respx_mock.post(f"{API_URL}/me/messages?access_token={ACCESS_TOKEN}").respond(json={})
-    await bot.channels.facebook.call_senders({"text": MESSAGE_TEXT}, dialog)
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.facebook.call_senders({"text": text}, dialog)
     request = respx_mock.calls.last.request
     assert json.loads(request.content) == {
         "recipient": {"id": str(USER_ID)},
@@ -129,8 +131,10 @@ async def test_send_image(bot, dialog, respx_mock):
         json={"status": 0, "message_token": "11"}
     )
 
+    caption = Mock()
+    caption.render = Mock(return_value=MESSAGE_TEXT)
     await bot.channels.facebook.call_senders(
-        {"image": {"url": IMAGE_URL, "caption": MESSAGE_TEXT}}, dialog
+        {"image": {"url": IMAGE_URL, "caption": caption}}, dialog
     )
     request = respx_mock.calls[0].request
     assert json.loads(request.content) == {

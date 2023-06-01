@@ -5,10 +5,10 @@ from importlib.util import module_from_spec, spec_from_loader
 from unittest.mock import Mock, sentinel
 
 import pytest
-from marshmallow import Schema, fields
 
 import maxbot.extensions._manager
 from maxbot.extensions import ExtensionManager
+from maxbot.maxml import Schema, fields
 from maxbot.resources import InlineResources
 
 
@@ -65,11 +65,16 @@ def test_entry_point_extensions(extension_mock, monkeypatch):
         "entry_points",
         Mock(
             return_value={
-                "maxbot_extensions": EntryPoint._from_text(
-                    "[options.entry_points]maxbot_extensions\n    my_extension = xxx:MyExtension"
-                ),
+                "maxbot_extensions": [
+                    EntryPoint(
+                        name="my_extension", group="options.entry_points", value="xxx:MyExtension"
+                    )
+                ]
             }
         ),
     )
+
+    # Clear entry points cache
+    ExtensionManager._ENTRY_POINTS = None
 
     _apply_and_assert_extension(ExtensionManager(), extension_mock)

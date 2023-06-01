@@ -2,7 +2,7 @@
   turns:
     - message: Are you open for breakfast?
       response: |
-        ![](https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg)
+        <image url="https://raw.githubusercontent.com/maxbot-ai/misc/main/food_1.jpg" />
 
         Truck Stop Gourmand is the brainchild of Gloria and Fred Smith.
         What started out as a food truck in 2004 has expanded into a thriving restaurant.
@@ -18,7 +18,6 @@
         In keeping with our commitment to giving you only fresh local ingredients, our menu
         changes daily to accommodate the produce we pick up in the morning. You can find
         today's menu on our website.
-
         Which menu do you want to see? [Standard] [Vegetarian] [Cake shop]
     - message: Cake shop
       response: To see our cake shop menu, go to the https://www.example.com/cake-menu.html.
@@ -26,9 +25,8 @@
   turns:
     - message: i want to cancel my order number TW12345.
       response: |
-        If the pickup time is more than 48 hours from now, you can cancel your order.
-
-        Just to confirm, you want to cancel order TW12345?
+        <text>If the pickup time is more than 48 hours from now, you can cancel your order.</text>
+        <text>Just to confirm, you want to cancel order TW12345?</text>
     - message: please do
       response: |
         OK. The order TW12345 is canceled.
@@ -37,18 +35,16 @@
   turns:
     - message: i want to cancel my order number TW12345.
       response: |
-        If the pickup time is more than 48 hours from now, you can cancel your order.
-
-        Just to confirm, you want to cancel order TW12345?
+        <text>If the pickup time is more than 48 hours from now, you can cancel your order.</text>
+        <text>Just to confirm, you want to cancel order TW12345?</text>
     - message: no
       response: What is the order number?
 - name: cancel_order_ask_number
   turns:
     - message: I want to cancel my order.
       response: |
-        If the pickup time is more than 48 hours from now, you can cancel your order.
-
-        What is the order number?
+        <text>If the pickup time is more than 48 hours from now, you can cancel your order.</text>
+        <text>What is the order number?</text>
     - message: TW12345
       response: |
         OK. The order TW12345 is canceled.
@@ -57,26 +53,22 @@
   turns:
     - message: I want to cancel my order.
       response: |
-        If the pickup time is more than 48 hours from now, you can cancel your order.
-
-        What is the order number?
+        <text>If the pickup time is more than 48 hours from now, you can cancel your order.</text>
+        <text>What is the order number?</text>
     - message: I don't know.
       response: |-
         I need the order number to cancel the order for you.
-
         If you don't know the order number, please call us at 958-234-3456 to cancel over the phone.
 - name: clarify_order_number
   turns:
     - message: I want to cancel my order.
       response: |
-        If the pickup time is more than 48 hours from now, you can cancel your order.
-
-        What is the order number?
+        <text>If the pickup time is more than 48 hours from now, you can cancel your order.</text>
+        <text>What is the order number?</text>
     - message: something like 12345
       response: |
         The correct format for our order numbers is AAnnnnn.
         The A's represents 2 uppercase letters, and the n's represent 5 numbers.
-
         Do you have an order number in that format?
     - message: it is TW12345
       response: |
@@ -86,26 +78,22 @@
   turns:
     - message: I want to cancel my order.
       response: |
-        If the pickup time is more than 48 hours from now, you can cancel your order.
-
-        What is the order number?
+        <text>If the pickup time is more than 48 hours from now, you can cancel your order.</text>
+        <text>What is the order number?</text>
     - message: something like 12345
       response: |
         The correct format for our order numbers is AAnnnnn.
         The A's represents 2 uppercase letters, and the n's represent 5 numbers.
-
         Do you have an order number in that format?
     - message: I don't know.
       response: |
         I need the order number to cancel the order for you.
-
         If you don't know the order number, please call us at 958-234-3456 to cancel over the phone.
 - name: personal_touch
   turns:
     - message: Who are you?
       response: |
         I am a bot that is designed to answer your questions about the Truck Stop Gourmand restaurant.
-
         What should I call you?
     - message: Jane
       response: Hello, Jane! It's lovely to meet you. How can I help you today?
