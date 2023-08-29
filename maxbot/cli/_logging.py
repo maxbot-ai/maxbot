@@ -1,6 +1,7 @@
 """CLI logging output."""
 import logging
 import logging.handlers
+import sys
 
 import click
 
@@ -11,18 +12,25 @@ def configure_logging(target, verbosity):
     :param str target: The name of the logger and its arguments.
     :param int verbosity: Output verbosity.
     """
+    if verbosity < -1:
+        logging.disable()
+        return
+
     _configure_libs(verbosity)
 
     if target == "console":
-        from ._rich import ConsoleLogHandler  # speed up loading time
+        if _stderr_is_non_interactive():
+            handler = _create_stderr_handler()
+        else:
+            from ._rich import ConsoleLogHandler  # speed up loading time
 
-        handler = ConsoleLogHandler()
+            handler = ConsoleLogHandler()
     elif target.startswith("file:"):
         handler = _create_file_handler(filename=target.removeprefix("file:"))
     else:
         raise click.BadParameter(f"unknown logger {target!r}.", param_hint="--logger")
 
-    loglevel = [logging.INFO, logging.DEBUG][min(verbosity, 1)]
+    loglevel = logging.DEBUG if verbosity >= 1 else logging.INFO
     handler.setLevel(loglevel)
 
     logging.basicConfig(level="NOTSET", handlers=[handler])
@@ -30,7 +38,7 @@ def configure_logging(target, verbosity):
 
 
 def _configure_libs(verbosity):
-    loglevel = [logging.WARNING, logging.INFO, logging.DEBUG][min(verbosity, 2)]
+    loglevel = [logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG][min(verbosity + 1, 3)]
     libs = [
         "asyncio",
         "httpx",
@@ -54,3 +62,17 @@ def _create_file_handler(filename):
         )
     handler.setFormatter(logging.Formatter("%(asctime)s -  %(levelname)s - %(message)s"))
     return handler
+
+
+def _create_stderr_handler():
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s -  %(processName)s - %(name)s - %(levelname)s - %(message)s"
+        )
+    )
+    return handler
+
+
+def _stderr_is_non_interactive():
+    return not sys.stderr.isatty()

@@ -57,6 +57,7 @@ const sidebars = {
       },
       collapsed: true,
       items: [
+        'design-guides/channel-setting',
         'design-guides/dialog-tree',
         'design-guides/slot-filling',
         'design-guides/digressions',
@@ -93,7 +94,12 @@ const sidebars = {
               'design-reference/numbers',
             ]
         },
-        'design-reference/stories'
+        'design-reference/stories',
+        'design-reference/timeout',
+        'design-reference/pool-limits',
+        'design-reference/timedelta',
+        'design-reference/channels',
+        'design-reference/mp',
       ],
     },
     {
@@ -108,6 +114,7 @@ const sidebars = {
         'extensions/babel',
         'extensions/rasa',
         'extensions/jinja_loader',
+        'extensions/rest',
       ],
     },
     {

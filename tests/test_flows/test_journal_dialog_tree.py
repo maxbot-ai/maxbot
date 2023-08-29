@@ -51,7 +51,10 @@ async def test_journal_response_jump_to():
     _, event, _, _ = ctx.journal_events
     assert event == {
         "type": "response",
-        "payload": {"node": {"condition": "true"}, "control_command": "jump_to"},
+        "payload": {
+            "node": {"condition": "true"},
+            "control_command": {"jump_to": {"node": "label1", "transition": "condition"}},
+        },
     }
 
 
@@ -74,7 +77,7 @@ async def test_journal_response_listen():
     ) = ctx.journal_events
     assert event == {
         "type": "response",
-        "payload": {"node": {"condition": "true"}, "control_command": "listen"},
+        "payload": {"node": {"condition": "true"}, "control_command": {"listen": {}}},
     }
 
 
@@ -97,7 +100,7 @@ async def test_journal_response_end():
     ) = ctx.journal_events
     assert event == {
         "type": "response",
-        "payload": {"node": {"condition": "true"}, "control_command": "end"},
+        "payload": {"node": {"condition": "true"}, "control_command": {"end": {}}},
     }
 
 
@@ -123,7 +126,7 @@ async def test_journal_response_followup():
         "type": "response",
         "payload": {
             "node": {"condition": "true", "label": "root1"},
-            "control_command": "followup",
+            "control_command": {"followup": {}},
         },
     }
 
@@ -173,7 +176,7 @@ async def test_journal_response_default_end():
     assert event == {"type": "response", "payload": {"node": {"condition": "true"}, "end": {}}}
 
 
-async def test_journal_response_return_after_digression():
+async def test_journal_digression():
     model = DialogTree(
         DialogNodeSchema(many=True).loads(
             """
@@ -194,8 +197,12 @@ async def test_journal_response_return_after_digression():
         components_state={"label1": {"slot_in_focus": "slot1"}},
     )
     assert await model(ctx, state) == FlowResult.LISTEN
-    _, _, event, _, _ = ctx.journal_events
-    assert event == {
+    _, event1, _, event2, _, _ = ctx.journal_events
+    assert event1 == {
+        "type": "digression_from",
+        "payload": {"node": {"condition": "true", "label": "label1"}},
+    }
+    assert event2 == {
         "type": "response",
         "payload": {"return_after_digression": {}, "node": {"condition": "true"}},
     }

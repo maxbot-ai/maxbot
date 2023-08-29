@@ -786,3 +786,69 @@ async def test_node_removed_gc_stack():
     assert await model(ctx, state) == FlowResult.DONE
     assert ctx.commands == [{"text": "root triggered"}]
     assert state == {"node_stack": []}
+
+
+async def test_response_digressing_false():
+    model = DialogTree(
+        DialogNodeSchema(many=True).loads(
+            """
+      - condition: true
+        response: "digressing={{ digressing }}"
+    """
+        )
+    )
+    ctx, state = make_context()
+    assert await model(ctx, state) == FlowResult.DONE
+    assert ctx.commands == [{"text": "digressing=False"}]
+
+
+async def test_response_digressing():
+    model = DialogTree(
+        DialogNodeSchema(many=True).loads(
+            """
+      - label: root
+        condition: true
+        followup:
+        - condition: false
+          response: unexpected
+        response: root triggered
+      - condition: true
+        response: "digressing={{ digressing }}"
+    """
+        )
+    )
+    ctx, state = make_context(state={"node_stack": [["root", "followup"]]})
+    assert await model(ctx, state) == FlowResult.LISTEN
+    assert ctx.commands == [
+        {"text": "digressing=True"},
+        {"text": "root triggered"},
+    ]
+
+
+async def test_response_digressing_with_slot_filling():
+    model = DialogTree(
+        DialogNodeSchema(many=True).loads(
+            """
+      - label: root
+        condition: true
+        followup:
+        - condition: false
+          response: unexpected
+        response: root triggered
+      - label: node_for_digression
+        condition: true
+        slot_filling:
+        - name: slot1
+          check_for: true
+          found: found
+        response: "digressing={{ digressing }}"
+    """
+        )
+    )
+    ctx, state = make_context(state={"node_stack": [["root", "followup"]]})
+    assert await model(ctx, state) == FlowResult.LISTEN
+    assert ctx.commands == [
+        {"text": "found"},
+        {"text": "digressing=True"},
+        {"text": "root triggered"},
+    ]

@@ -6,6 +6,7 @@ from maxbot.context import (
     EntitiesProxy,
     EntitiesResult,
     IntentsResult,
+    JournalledDict,
     RecognizedEntity,
     RecognizedIntent,
     RpcContext,
@@ -248,3 +249,16 @@ def test_utc_time():
 def test_today():
     ctx = TurnContext(dialog=None, message={"text": "hello world"})
     assert ctx.create_scenario_context({})["utc_today"] == ctx.utc_time.date()
+
+
+def test_journalled_dict_len():
+    d = JournalledDict()
+    assert len(d) == 0
+    d["a"] = 1
+    assert len(d) == 1
+    d["a"] = 2
+    assert len(d) == 1
+    d["b"] = 2
+    assert len(d) == 2
+    del d["a"]
+    assert len(d) == 1

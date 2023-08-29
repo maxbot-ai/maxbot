@@ -1,4 +1,4 @@
-"""User Locks allow user requests to be processed in FIFO order."""
+"""An `asyncio.Lock` -based implementation of user lock."""
 
 import asyncio
 from contextlib import asynccontextmanager

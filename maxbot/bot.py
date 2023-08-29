@@ -1,13 +1,12 @@
 """Create and run conversations applications."""
 import asyncio
 import logging
-import os
 
 from .channels import ChannelsCollection
 from .dialog_manager import DialogManager
 from .errors import BotError
 from .resources import Resources
-from .user_locks import AsyncioLocks
+from .user_locks import AsyncioLocks, UnixSocketStreams
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +19,27 @@ class MaxBot:
         dialog_manager=None,
         channels=None,
         user_locks=None,
-        state_store=None,
+        persistence_manager=None,
         resources=None,
+        history_tracked=False,
     ):
         """Create new class instance.
 
         :param DialogManager dialog_manager: Dialog manager.
         :param ChannelsCollection channels: Channels for communication with users.
-        :param StateStore state_store: State store.
+        :param PersistenceManager persistence_manager: Persistence manager.
         :param Resources resources: Resources for tracking and reloading changes.
         """
         self.dialog_manager = dialog_manager or DialogManager()
         self.channels = channels or ChannelsCollection.empty()
-        self._state_store = state_store  # the default value is initialized lazily
-        self.user_locks = user_locks or AsyncioLocks()
+        self._persistence_manager = persistence_manager  # the default value is initialized lazily
+        self._history_tracked = history_tracked
+        self._user_locks = user_locks
         self.resources = resources or Resources.empty()
+
+    SocketStreams = UnixSocketStreams
+    SUFFIX_LOCKS = "-locks.sock"
+    SUFFIX_DB = ".db"
 
     @classmethod
     def builder(cls, **kwargs):
@@ -85,6 +90,23 @@ class MaxBot:
         return builder.build()
 
     @property
+    def user_locks(self):
+        """Get user locks implementation."""
+        if self._user_locks is None:
+            self._user_locks = AsyncioLocks()
+        return self._user_locks
+
+    def setdefault_user_locks(self, value):
+        """Set .user_locks field value if it is not set.
+
+        :param AsyncioLocks value: User locks object.
+        :return AsyncioLocks: .user_locks field value
+        """
+        if self._user_locks is None:
+            self._user_locks = value
+        return self._user_locks
+
+    @property
     def rpc(self):
         """Get RPC manager used by the bot.
 
@@ -93,14 +115,24 @@ class MaxBot:
         return self.dialog_manager.rpc
 
     @property
-    def state_store(self):
-        """State store used to maintain state variables."""
-        if self._state_store is None:
+    def persistence_manager(self):
+        """Return persistence manager."""
+        if self._persistence_manager is None:
             # lazy import to speed up load time
-            from .state_store import SQLAlchemyStateStore
+            from .persistence_manager import SQLAlchemyManager
 
-            self._state_store = SQLAlchemyStateStore()
-        return self._state_store
+            self._persistence_manager = SQLAlchemyManager()
+        return self._persistence_manager
+
+    def setdefault_persistence_manager(self, factory):
+        """Set .persistence_manager field value if it is not set.
+
+        :param callable factory: Persistence manager factory.
+        :return SQLAlchemyStateStore: .persistence_manager field value.
+        """
+        if self._persistence_manager is None:
+            self._persistence_manager = factory()
+        return self._persistence_manager
 
     def process_message(self, message, dialog=None):
         """Process user message.
@@ -115,8 +147,10 @@ class MaxBot:
         """
         if dialog is None:
             dialog = self._default_dialog()
-        with self.state_store(dialog) as state:
-            return asyncio.run(self.dialog_manager.process_message(message, dialog, state))
+        with self.persistence_manager(dialog) as tracker:
+            return asyncio.run(
+                self.dialog_manager.process_message(message, dialog, tracker.get_state())
+            )
 
     def process_rpc(self, request, dialog=None):
         """Process RPC request.
@@ -131,8 +165,10 @@ class MaxBot:
         """
         if dialog is None:
             dialog = self._default_dialog()
-        with self.state_store(dialog) as state:
-            return asyncio.run(self.dialog_manager.process_rpc(request, dialog, state))
+        with self.persistence_manager(dialog) as tracker:
+            return asyncio.run(
+                self.dialog_manager.process_rpc(request, dialog, tracker.get_state())
+            )
 
     def _default_dialog(self):
         return {"channel_name": "builtin", "user_id": "1"}
@@ -148,10 +184,14 @@ class MaxBot:
             message = await channel.call_receivers(data)
             if message is None:
                 return
-            with self.state_store(dialog) as state:
-                commands = await self.dialog_manager.process_message(message, dialog, state)
+            with self.persistence_manager(dialog) as tracker:
+                commands = await self.dialog_manager.process_message(
+                    message, dialog, tracker.get_state()
+                )
                 for command in commands:
                     await channel.call_senders(command, dialog)
+                if self._history_tracked:
+                    tracker.set_message_history(message, commands)
 
     async def default_rpc_adapter(self, request, channel, user_id):
         """Handle RPC request for specific channel.
@@ -162,66 +202,14 @@ class MaxBot:
         """
         dialog = {"channel_name": channel.name, "user_id": str(user_id)}
         async with self.user_locks(dialog):
-            with self.state_store(dialog) as state:
-                commands = await self.dialog_manager.process_rpc(request, dialog, state)
+            with self.persistence_manager(dialog) as tracker:
+                commands = await self.dialog_manager.process_rpc(
+                    request, dialog, tracker.get_state()
+                )
                 for command in commands:
                     await channel.call_senders(command, dialog)
-
-    def run_webapp(self, host="localhost", port="8080", *, public_url=None, autoreload=False):
-        """Run web application.
-
-        :param str host: Hostname or IP address on which to listen.
-        :param int port: TCP port on which to listen.
-        :param str public_url: Base url to register webhook.
-        :param bool autoreload: Enable tracking and reloading bot resource changes.
-        """
-        # lazy import to speed up load time
-        import sanic
-
-        self._validate_at_least_one_channel()
-
-        app = sanic.Sanic("maxbot", configure_logging=False)
-        app.config.FALLBACK_ERROR_FORMAT = "text"
-
-        for channel in self.channels:
-            if public_url is None:
-                logger.warning(
-                    "Make sure you have a public URL that is forwarded to -> "
-                    f"http://{host}:{port}/{channel.name} and register webhook for it."
-                )
-
-            app.blueprint(
-                channel.blueprint(
-                    self.default_channel_adapter,
-                    public_url=public_url,
-                    webhook_path=f"/{channel.name}",
-                )
-            )
-
-        if self.rpc:
-            app.blueprint(self.rpc.blueprint(self.channels, self.default_rpc_adapter))
-
-        if autoreload:
-
-            @app.after_server_start
-            async def start_autoreloader(app, loop):
-                app.add_task(self.autoreloader, name="autoreloader")
-
-            @app.before_server_stop
-            async def stop_autoreloader(app, loop):
-                await app.cancel_task("autoreloader")
-
-        @app.after_server_start
-        async def report_started(app, loop):
-            logger.info(
-                f"Started webhooks updater on http://{host}:{port}. Press 'Ctrl-C' to exit."
-            )
-
-        if sanic.__version__.startswith("21."):
-            app.run(host, port, motd=False, workers=1)
-        else:
-            os.environ["SANIC_IGNORE_PRODUCTION_WARNING"] = "true"
-            app.run(host, port, motd=False, single_process=True)
+                if self._history_tracked:
+                    tracker.set_rpc_history(request, commands)
 
     def run_polling(self, autoreload=False):
         """Run polling application.
@@ -229,13 +217,17 @@ class MaxBot:
         :param bool autoreload: Enable tracking and reloading bot resource changes.
         """
         # lazy import to speed up load time
-        from telegram.ext import ApplicationBuilder, MessageHandler, filters
+        from telegram.ext import ApplicationBuilder, CallbackQueryHandler, MessageHandler, filters
 
-        self._validate_at_least_one_channel()
+        self.validate_at_least_one_channel()
         self._validate_polling_support()
 
         builder = ApplicationBuilder()
         builder.token(self.channels.telegram.config["api_token"])
+
+        builder.request(self.channels.telegram.create_request())
+        builder.get_updates_request(self.channels.telegram.create_request())
+
         background_tasks = []
 
         @builder.post_init
@@ -263,6 +255,7 @@ class MaxBot:
 
         app = builder.build()
         app.add_handler(MessageHandler(filters.ALL, callback))
+        app.add_handler(CallbackQueryHandler(callback=callback, pattern=None))
         app.add_error_handler(error_handler)
         app.run_polling()
 
@@ -311,7 +304,8 @@ class MaxBot:
             )
         return changes - unsupported
 
-    def _validate_at_least_one_channel(self):
+    def validate_at_least_one_channel(self):
+        """Raise BotError if at least one channel is missing."""
         if not self.channels:
             raise BotError(
                 "At least one channel is required to run a bot. "

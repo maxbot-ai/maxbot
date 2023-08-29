@@ -747,3 +747,171 @@ Let's take an overall look to the slot filling flow. When a user input is receiv
 	* A [digression](digressions.md) into the root level dialog nodes.
 	* `not_found` response of previously prompted slot.
 * `prompt` response of the first empty slot is processed.
+
+## Advices on response scenario
+
+When you are working with digressions from `slot_filling`, it is worth paying attention to the specifics of the bot's work.
+
+For instance, consider the example below:
+
+<Tabs
+    defaultValue="snippet"
+    values={[
+        {label: 'Snippet', value: 'snippet'},
+        {label: 'Full', value: 'full'},
+    ]}>
+<TabItem value="snippet">
+
+```yaml
+dialog:
+  - condition: intents.restaurant_opening_hours
+    label: restaurant_opening_hours
+    response: |
+      The restaurant is open from 8am to 8pm.
+  - condition: intents.reservation
+    label: reservation
+    slot_filling:
+      - name: date
+        check_for: entities.date
+        prompt: |
+          What day would you like to come in?
+      - name: time
+        check_for: entities.time
+        prompt: |
+          What time do you want the reservation to be made for?
+      - name: guests
+        check_for: entities.number
+        prompt: |
+          How many people will be dining?
+    response: |
+      OK. I am making you a reservation for {{ slots.guests }}
+      on {{ slots.date }} at {{ slots.time }}.<br />
+      Do you want to make one more reservation?
+      {% delete slots.date %}
+      {% delete slots.time %}
+      {% delete slots.guests %}
+    followup:
+      - condition: entities.yes
+        response: |
+          <jump_to node="reservation" transition="response" />
+      - condition: entities.no
+        response: Ok, have a good day!
+```
+
+</TabItem>
+<TabItem value="full">
+
+  ```yaml
+  channels:
+    telegram:
+      api_token: !ENV ${TELEGRAM_API_KEY}
+  intents:
+    - name: reservation
+      examples:
+        - i'd like to make a reservation
+        - I want to reserve a table for dinner
+        - Can 3 of us get a table for lunch on May 29, 2022 at 5pm?
+        - do you have openings for next Wednesday at 7?
+        - Is there availability for 4 on Tuesday night?
+        - i'd like to come in for brunch tomorrow
+        - can i reserve a table?
+    - name: restaurant_opening_hours
+      examples:
+        - When does the restaurant close?
+        - When is the restaurant open?
+        - What are the restaurant opening hours
+        - Restaurant openin hours
+        - What time do you close?
+        - When do you close?
+        - When do you open?
+        - At what time do you open?
+  entities:
+    - name: yes
+      values:
+        - name: all
+          phrases:
+          - yes
+    - name: no
+      values:
+        - name: all
+          phrases:
+          - no
+  dialog:
+    - condition: intents.restaurant_opening_hours
+      label: restaurant_opening_hours
+      response: |
+        The restaurant is open from 8am to 8pm.
+    - condition: intents.reservation
+      label: reservation
+      slot_filling:
+        - name: date
+          check_for: entities.date
+          prompt: |
+            What day would you like to come in?
+        - name: time
+          check_for: entities.time
+          prompt: |
+            What time do you want the reservation to be made for?
+        - name: guests
+          check_for: entities.number
+          prompt: |
+            How many people will be dining?
+      response: |
+        OK. I am making you a reservation for {{ slots.guests }}
+        on {{ slots.date }} at {{ slots.time }}.<br />
+        Do you want to make one more reservation?
+        {% delete slots.date %}
+        {% delete slots.time %}
+        {% delete slots.guests %}
+      followup:
+        - condition: entities.yes
+          response: |
+            <jump_to node="reservation" transition="response" />
+        - condition: entities.no
+          response: Ok, have a good day!
+  ```
+
+</TabItem>
+</Tabs>
+
+The conversation could go like this:
+
+```
+🧑 I'd like to make a reservation for 6 people tomorrow at 5 pm
+🤖 OK. I am making you a reservation for 6 on 2023-06-22 at 17:00:00. Do you want to make one more reservation?
+🧑 When does the restaurant close?
+🤖 The restaurant is open from 8am to 8pm.
+🤖 What day would you like to come in?
+```
+Slots with reservation data were processed and then reset. The client made a digression to the `restaurant_opening_hours` node, and after he was returned to node `reservation`. Since the slots were reset, the recording is started over.
+
+To avoid this behavior, you need to ask the question "Do you want to make one more reservation?" in a separate node:
+
+```yaml
+...
+    response: |
+      OK. I am making you a reservation for {{ slots.guests }}
+      on {{ slots.date }} at {{ slots.time }}.<br />
+      {% delete slots.date %}
+      {% delete slots.time %}
+      {% delete slots.guests %}
+      <jump_to node="ask_make_new_reservation" transition="response" />
+  - condition: false
+    label: ask_make_new_reservation
+    response: |
+      Do you want to make one more reservation?
+    followup:
+      - condition: entities.yes
+        response: |
+          <jump_to node="reservation" transition="response" />
+      - condition: entities.no
+        response: Ok, have a good day!
+```
+```
+🧑 I'd like to make a reservation for 6 people tomorrow at 5 pm
+🤖 OK. I am making you a reservation for 6 on 2023-06-22 at 17:00:00.
+🤖 Do you want to make one more reservation?
+🧑 When does the restaurant close?
+🤖 The restaurant is open from 8am to 8pm.
+🤖 Do you want to make one more reservation?
+```

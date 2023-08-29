@@ -7,11 +7,10 @@ from click.testing import CliRunner
 from sanic import Sanic
 
 import maxbot.cli
-from maxbot import MaxBot
 
 
 def test_ngrok(runner, monkeypatch, respx_mock, botfile):
-    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(maxbot.cli.run, "run_webapp", Mock())
 
     respx_mock.get("http://localhost:4040/api/tunnels").respond(
         json={
@@ -37,13 +36,14 @@ def test_ngrok(runner, monkeypatch, respx_mock, botfile):
             "--bot",
             botfile,
             "--ngrok",
+            "--single-process",
         ],
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
 
-    ca = MaxBot.run_webapp.call_args
-    assert ca.args == ("localhost", 8080)
+    ca = maxbot.cli.run.run_webapp.call_args
+    assert ca.args[2:] == ("localhost", 8080)
     assert ca.kwargs["public_url"] == "https://7ad1-109-172-248-9.ngrok.io"
 
     request = respx_mock.calls.last.request
@@ -51,7 +51,7 @@ def test_ngrok(runner, monkeypatch, respx_mock, botfile):
 
 
 def test_url(runner, monkeypatch, respx_mock, botfile):
-    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(maxbot.cli.run, "run_webapp", Mock())
 
     respx_mock.get("http://localhost:4041/api/tunnels").respond(
         json={
@@ -72,7 +72,7 @@ def test_url(runner, monkeypatch, respx_mock, botfile):
 
     result = runner.invoke(
         maxbot.cli.main,
-        ["run", "--bot", botfile, "--ngrok-url", "http://localhost:4041/"],
+        ["run", "--bot", botfile, "--ngrok-url", "http://localhost:4041/", "--single-process"],
         catch_exceptions=False,
     )
 

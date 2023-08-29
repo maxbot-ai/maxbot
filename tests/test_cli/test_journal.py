@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from maxbot.cli._journal import Dumper, FileJournal, JournalChain
+from maxbot.cli._journal import Dumper, FileJournal, FileQuietJournal, no_journal
 from maxbot.context import (
     EntitiesResult,
     IntentsResult,
@@ -28,6 +28,16 @@ def yaml_journal(tmp_path):
 
 
 @pytest.fixture
+def jsonl_quiet_journal(tmp_path):
+    yield from _file_journal(tmp_path, Dumper.json_line, klass=FileQuietJournal)
+
+
+@pytest.fixture
+def yaml_quiet_journal(tmp_path):
+    yield from _file_journal(tmp_path, Dumper.yaml_triple_dash, klass=FileQuietJournal)
+
+
+@pytest.fixture
 def ctx():
     ctx = TurnContext(
         dialog={"channel_name": "test", "user_id": "123"},
@@ -47,6 +57,11 @@ def test_jsonl_basic(ctx, jsonl_journal):
     assert '"response": "<text>Good day to you!</text>"' in out, out
 
 
+def test_jsonl_quiet_basic(ctx, jsonl_quiet_journal):
+    ctx.commands.append({"text": markup.Value([markup.Item(markup.TEXT, "Good day to you!")])})
+    assert not jsonl_quiet_journal(ctx)
+
+
 def test_yaml_basic(ctx, yaml_journal):
     ctx.commands.append({"text": markup.Value([markup.Item(markup.TEXT, "Good day to you!")])})
 
@@ -58,6 +73,11 @@ def test_yaml_basic(ctx, yaml_journal):
     assert "message:" in out, out
     assert "  text: hello world" in out, out
     assert "response: <text>Good day to you!</text>" in out, out
+
+
+def test_yaml_quiet_basic(ctx, yaml_quiet_journal):
+    ctx.commands.append({"text": markup.Value([markup.Item(markup.TEXT, "Good day to you!")])})
+    assert not yaml_quiet_journal(ctx)
 
 
 def test_jsonl_intents(jsonl_journal):
@@ -232,6 +252,15 @@ def test_jsonl_logs(ctx, jsonl_journal):
     ) in out
 
 
+def test_jsonl_quiet_error(ctx, jsonl_quiet_journal):
+    ctx.debug(("what is here?", {"xxx": "yyy"}))
+    ctx.warning("something wrong")
+    ctx.set_error(BotError("some error"))
+
+    out = jsonl_quiet_journal(ctx)
+    assert out.strip() == '{"error": {"message": "some error"}}'
+
+
 def test_yaml_logs(ctx, yaml_journal):
     ctx.debug(("what is here?", {"xxx": "yyy"}))
     ctx.warning("something wrong")
@@ -256,6 +285,26 @@ def test_yaml_logs(ctx, yaml_journal):
         "error:\n"
         "  message: some error"
     ) in out
+
+
+def test_yaml_quiet_error(ctx, yaml_quiet_journal):
+    ctx.debug(("what is here?", {"xxx": "yyy"}))
+    ctx.warning("something wrong")
+    ctx.set_error(BotError("some error"))
+
+    out = yaml_quiet_journal(ctx)
+    assert out.strip() == "error:\n  message: some error\n---"
+
+
+def test_no_journal(ctx, capsys):
+    ctx.commands.append({"text": markup.Value([markup.Item(markup.TEXT, "Good day to you!")])})
+    ctx.debug(("what is here?", {"xxx": "yyy"}))
+    ctx.warning("something wrong")
+    ctx.set_error(BotError("some error"))
+    no_journal(ctx)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
 
 
 def test_jsonl_error_snippet(ctx, jsonl_journal):
@@ -366,17 +415,20 @@ def test_yaml_journal_events(ctx, yaml_journal):
     ) in out, out
 
 
-def test_journal_chain():
-    history = []
-    journal = JournalChain([lambda ctx: history.append(1), lambda ctx: history.append(2)])
-    journal(ctx=None)
-    assert history == [1, 2]
+def test_yaml_journal_events_no_aliases(ctx, yaml_journal):
+    d = {"key1": "value1", "key2": "value2", "key3": "value3", "key4": "value4"}
+    ctx.journal_event("test", {"d1": d, "d2": d})
+
+    out = yaml_journal(ctx)
+
+    assert "d1:\n" in out, out
+    assert "d2:\n" in out, out
 
 
-def _file_journal(tmp_path, dumps):
+def _file_journal(tmp_path, dumps, klass=FileJournal):
     journal_file = tmp_path / "maxbot.journal"
     with journal_file.open("a") as f:
-        journal = FileJournal(f, dumps)
+        journal = klass(f, dumps)
 
         def call(ctx):
             journal(ctx)

@@ -187,7 +187,7 @@ async def test_sanic_endpoint(bot, respx_mock, update_text):
     callback = AsyncMock()
 
     app = Sanic(__name__)
-    app.blueprint(bot.channels.telegram.blueprint(callback))
+    app.blueprint(bot.channels.telegram.blueprint(callback, None))
     _, response = await app.asgi_client.post("/telegram", json=UPDATE_TEXT)
     assert response.status_code == 204, response.text
     assert response.text == ""
@@ -198,10 +198,62 @@ async def test_sanic_register_webhook(bot, respx_mock, monkeypatch):
     respx_mock.post(f"{API_URL}/setWebhook").respond(json={"result": {}})
     monkeypatch.setattr(Blueprint, "after_server_start", Mock())
 
-    bp = bot.channels.telegram.blueprint(AsyncMock(), public_url="https://example.com/")
+    async def execute_once(app, fn):
+        await fn()
+
+    bp = bot.channels.telegram.blueprint(
+        AsyncMock(), execute_once, public_url="https://example.com/"
+    )
     for call in bp.after_server_start.call_args_list:
         (coro,) = call.args
         await coro(Mock(), Mock())
 
     request = respx_mock.calls.last.request
     assert request.content == b"url=https%3A%2F%2Fexample.com%2Ftelegram"
+
+
+async def test_timeout_not_specified(bot, respx_mock, dialog):
+    respx_mock.post(f"{API_URL}/sendMessage").respond(json={"result": {}})
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+
+    await bot.channels.telegram.call_senders({"text": text}, dialog)
+    assert [c.request.extensions["timeout"] for c in respx_mock.calls] == [
+        {"connect": 5.0, "read": 5.0, "write": 5.0, "pool": 5.0},
+    ]
+
+
+async def test_timeout_send_photo(respx_mock, dialog):
+    bot = MaxBot.inline(
+        f"""
+        channels:
+            telegram:
+                api_token: {API_TOKEN}
+                timeout:
+                  default: 3.5
+                  connect: 1.0
+    """
+    )
+    respx_mock.post(f"{API_URL}/sendPhoto").respond(json={"result": {}})
+    url = "https://api.telegram.org/file/bot110201543/photos/file_21.jpg"
+    respx_mock.get(url).respond(stream=b"IMAGE_CONTENT")
+
+    await bot.channels.telegram.call_senders({"image": {"url": url}}, dialog)
+    assert [c.request.extensions["timeout"] for c in respx_mock.calls] == [
+        {"connect": 1.0, "read": 3.5, "write": 3.5, "pool": 3.5},
+        {"connect": 1.0, "read": 3.5, "write": 20, "pool": 3.5},  # send_photo(write_timeout=20)
+    ]
+
+
+async def test_limits():
+    MaxBot.inline(
+        f"""
+        channels:
+            telegram:
+                api_token: {API_TOKEN}
+                limits:
+                  max_keepalive_connections: 1
+                  max_connections: 2
+                  keepalive_expiry: 3
+    """
+    )

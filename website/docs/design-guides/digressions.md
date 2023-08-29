@@ -281,6 +281,16 @@ For example, this node will never be triggered during digressions.
   response: |
     {# ... #}
 ```
+Also, the `digressing` condition can be checked in response. Next example shows how to prevent from jumping to a specific node in digression:
+
+```yaml
+- condition: intents.some_intent
+  response: |
+    ...
+    {% if not digressing %}
+      <jump_to node="some_node" transition="response" />
+    {% endif %}
+```
 
 ### Break digression chain {#end-command}
 

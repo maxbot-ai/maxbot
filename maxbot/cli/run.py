@@ -1,6 +1,9 @@
 """Command Line Interface for a Bot."""
+from functools import partial
+
 import click
 
+from ..webapp import run_webapp
 from ._bot import resolve_bot
 from ._journal import create_journal
 from ._logging import configure_logging
@@ -77,7 +80,8 @@ from ._ngrok import ask_ngrok
     default=True,
     help="Watch bot files and reload on changes.",
 )
-@click.option("-v", "--verbose", count=True, help="Set the verbosity level.")
+@click.option("-v", "--verbose", count=True, help="Increasing the level of verbosity.")
+@click.option("-q", "--quiet", count=True, help="Decreasing the level of verbosity.")
 @click.option(
     "--logger",
     type=str,
@@ -87,13 +91,6 @@ from ._ngrok import ask_ngrok
         "Write the developer logs to console or file:/path/to/file.log. "
         "Use the --journal-file option to redirect the journal."
     ),
-)
-@click.option(
-    "--quiet",
-    "-q",
-    is_flag=True,
-    default=False,
-    help="Do not log to console.",
 )
 @click.option(
     "--journal-file",
@@ -106,6 +103,26 @@ from ._ngrok import ask_ngrok
     default="json",
     show_default=True,
     help="Journal file format",
+)
+@click.option(
+    "--workers",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of web application worker processes to spawn. Cannot be used with `fast`.",
+)
+@click.option(
+    "--fast",
+    is_flag=True,
+    default=False,
+    help="Set the number of web application workers to max allowed.",
+)
+@click.option(
+    "--single-process",
+    "single_process",
+    is_flag=True,
+    default=False,
+    help="Run web application in a single process.",
 )
 @click.pass_context
 def run(
@@ -123,6 +140,9 @@ def run(
     quiet,
     journal_file,
     journal_output,
+    workers,
+    fast,
+    single_process,
 ):
     """
     Run the bot.
@@ -158,31 +178,41 @@ def run(
     maxbot run --bot bot.yaml --ngrok
 
     \b
-    # log to file
-    maxbot run --bot bot.yaml --logger file:/var/log/maxbot.log
+    # verbose journal output and discard logger messages
+    maxbot run --bot bot.yaml -vv --logger file:/dev/null
 
     \b
-    # journal to file and to console
-    maxbot run --bot bot.yaml --journal-file /var/log/maxbot.jsonl
-
-    \b
-    # journal to file only
-    maxbot run --bot bot.yaml -q --journal-file /var/log/maxbot.jsonl
+    # print to console (journal and logger) errors only
+    maxbot run --bot bot.yaml -q
     """
-    if not quiet:
-        configure_logging(logger, verbose)
+    if quiet and verbose:
+        raise click.UsageError("Options -q and -v are mutually exclusive.")
+
+    verbosity = verbose if verbose else (0 - quiet)
 
     from ._rich import Progress
 
+    init_logging = partial(configure_logging, logger, verbosity)
+    init_logging()
+
+    bot_factory = partial(create_bot, bot_spec, logger, verbosity, journal_file, journal_output)
     with Progress(transient=True) as progress:
         progress.add_task("Loading resources", total=None)
 
-        bot = resolve_bot(bot_spec)
-        bot.dialog_manager.journal(create_journal(verbose, quiet, journal_file, journal_output))
+        bot = bot_factory()
 
     polling_conflicts = [
         next(p.get_error_hint(ctx) for p in ctx.command.params if p.name == name)
-        for name in ("host", "port", "public_url", "ngrok", "ngrok_url")
+        for name in (
+            "host",
+            "port",
+            "public_url",
+            "ngrok",
+            "ngrok_url",
+            "workers",
+            "fast",
+            "single_process",
+        )
         if ctx.get_parameter_source(name) != click.core.ParameterSource.DEFAULT
     ]
 
@@ -214,6 +244,25 @@ def run(
                     f"Option '--ngrok'/'--ngrok-url' conflicts with {', '.join(ngrok_conflicts)}."
                 )
             host, port, public_url = ask_ngrok(ngrok_url)
-        bot.run_webapp(host, port, public_url=public_url, autoreload=autoreload)
+
+        run_webapp(
+            bot,
+            bot_factory,
+            host,
+            port,
+            init_logging=init_logging,
+            public_url=public_url,
+            autoreload=autoreload,
+            workers=workers,
+            fast=fast,
+            single_process=single_process,
+        )
     else:
         raise AssertionError(f"Unexpected updater {updater}.")  # pragma: no cover
+
+
+def create_bot(bot_spec, logger, verbosity, journal_file, journal_output):
+    """Create new instance of MaxBot."""
+    bot = resolve_bot(bot_spec)
+    bot.dialog_manager.journal(create_journal(verbosity, journal_file, journal_output))
+    return bot

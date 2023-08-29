@@ -9,7 +9,7 @@ from viberbot.api.messages.text_message import TextMessage
 from viberbot.api.viber_requests import ViberMessageRequest, create_request
 from viberbot.api.viber_requests.viber_request import ViberRequest
 
-from ..maxml import Schema, fields
+from ..maxml import PoolLimitSchema, Schema, TimeoutSchema, fields
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +17,14 @@ logger = logging.getLogger(__name__)
 class Gateway:
     """Viber Gateway."""
 
-    httpx_client = httpx.AsyncClient(base_url="https://chatapi.viber.com/pa", timeout=3)
-
-    def __init__(self, api_token):
+    def __init__(self, api_token, **kwargs):
         """Create a new class instance.
 
         :param str auth_token: Viber auth token.
+        :param dict kwargs: Arguments for creating HTTPX asynchronous client.
         """
         self.api_token = api_token
+        self.httpx_client = httpx.AsyncClient(base_url="https://chatapi.viber.com/pa", **kwargs)
 
     async def send_request(self, method, payload=None):
         """Send request to Facebook.
@@ -120,6 +120,14 @@ class ViberChannel:
         # https://developers.viber.com/docs/api/python-bot-api/#userprofile-object
         avatar = fields.Str()
 
+        # Default HTTP request timeouts
+        # https://www.python-httpx.org/advanced/#timeout-configuration
+        timeout = fields.Nested(TimeoutSchema())
+
+        # Pool limit configuration
+        # https://www.python-httpx.org/advanced/#pool-limit-configuration
+        limits = fields.Nested(PoolLimitSchema())
+
     @cached_property
     def _api(self):
         """Return viber api connected to your bot.
@@ -129,7 +137,13 @@ class ViberChannel:
         :return Api:
         """
         return _Api(
-            Gateway(self.config["api_token"]), self.config.get("name"), self.config.get("avatar")
+            Gateway(
+                self.config["api_token"],
+                timeout=self.config.get("timeout", TimeoutSchema.DEFAULT),
+                limits=self.config.get("limits", PoolLimitSchema.DEFAULT),
+            ),
+            self.config.get("name"),
+            self.config.get("avatar"),
         )
 
     async def create_dialog(self, request: ViberRequest):
@@ -204,10 +218,11 @@ class ViberChannel:
                 return content
         return None
 
-    def blueprint(self, callback, public_url=None, webhook_path=None):
+    def blueprint(self, callback, execute_once, public_url=None, webhook_path=None):
         """Create web application blueprint to receive incoming updates.
 
         :param callable callback: a callback for received messages.
+        :param callable execute_once: Execute only for first WEB application worker.
         :param string public_url: Base url to register webhook.
         :param string webhook_path: An url path to receive incoming updates.
         :return Blueprint: Blueprint for sanic app.
@@ -222,6 +237,7 @@ class ViberChannel:
 
         @bp.post(webhook_path)
         async def webhook(request):
+            logger.debug("%s", request.json)
             request_data = create_request(request.json)
             if request_data.event_type == "message":
                 await callback(request_data, self)
@@ -231,8 +247,11 @@ class ViberChannel:
 
             @bp.after_server_start
             async def register_webhook(app, loop):
-                webhook_url = urljoin(public_url, webhook_path)
-                await self._api.set_webhook(webhook_url)
-                logger.info(f"Registered webhook {webhook_url}.")
+                async def _impl():
+                    webhook_url = urljoin(public_url, webhook_path)
+                    await self._api.set_webhook(webhook_url)
+                    logger.info(f"Registered webhook {webhook_url}.")
+
+                await execute_once(app, _impl)
 
         return bp

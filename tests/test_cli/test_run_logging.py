@@ -13,20 +13,14 @@ from maxbot.schemas import ResourceSchema
 
 
 def test_logger_file(runner, botfile, tmp_path, monkeypatch):
-    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    monkeypatch.setattr(maxbot.cli.run, "run_webapp", Mock())
     monkeypatch.setattr(logging, "basicConfig", Mock())
 
     logfile = tmp_path / "maxbot.log"
 
     result = runner.invoke(
         maxbot.cli.main,
-        [
-            "run",
-            "--bot",
-            botfile,
-            "--logger",
-            f"file:{logfile}",
-        ],
+        ["run", "--bot", botfile, "--logger", f"file:{logfile}", "--single-process"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
@@ -36,18 +30,17 @@ def test_logger_file(runner, botfile, tmp_path, monkeypatch):
 
 @pytest.fixture
 def console_handler(runner, botfile, monkeypatch):
-    monkeypatch.setattr(MaxBot, "run_webapp", Mock())
+    return _console_handler(runner, botfile, monkeypatch)
+
+
+def _console_handler(runner, botfile, monkeypatch, non_interactive=False):
+    monkeypatch.setattr(maxbot.cli.run, "run_webapp", Mock())
     monkeypatch.setattr(logging, "basicConfig", Mock())
+    monkeypatch.setattr(maxbot.cli._logging, "_stderr_is_non_interactive", lambda: non_interactive)
 
     result = runner.invoke(
         maxbot.cli.main,
-        [
-            "run",
-            "--bot",
-            botfile,
-            "--logger",
-            "console",
-        ],
+        ["run", "--bot", botfile, "--logger", "console", "--single-process"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
@@ -62,7 +55,7 @@ def _make_log_record(log_level, message, args=tuple()):
 def test_logger_console(console_handler, capsys):
     console_handler.emit(_make_log_record(logging.INFO, "foo bar"))
     _, err = capsys.readouterr()
-    assert "✓ foo bar" in err
+    assert " - MainProcess - foo bar" in err
 
 
 def test_logger_console_bot_error(console_handler, capsys):
@@ -77,6 +70,11 @@ def test_logger_console_bot_error(console_handler, capsys):
     assert "✗ Got bot error: something failed" in err
     assert '  in "<unicode string>", line 1, column 1' in err
     assert "  ❱ 1 s: hello world" in err
+
+
+def test_logger_non_interactive(runner, botfile, monkeypatch):
+    handler = _console_handler(runner, botfile, monkeypatch, non_interactive=True)
+    assert isinstance(handler, logging.StreamHandler)
 
 
 def test_logger_bad_file(runner, tmp_path):

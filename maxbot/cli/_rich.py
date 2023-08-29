@@ -27,7 +27,9 @@ from ._yaml_dumper import yaml_frendly_dumps
 STDOUT = Console()
 STDERR = Console(stderr=True)
 # Make sure the STDERR output displayed above the progress display.
-Progress = functools.partial(_Progress, console=STDERR)
+Progress = functools.partial(
+    _Progress, console=STDERR, redirect_stdout=False, redirect_stderr=False
+)
 
 
 class PrettyJournal:
@@ -36,16 +38,19 @@ class PrettyJournal:
     class VerbosityLevel(IntEnum):
         """Level of verbosity."""
 
+        INFO = 0
         NLU = 1
+        VAR_DIFF = 1
         JOURNAL = 2
+        VAR_FULL = 2
 
-    def __init__(self, verbose=0, console=None):
+    def __init__(self, verbosity=0, console=None):
         """Create class instance.
 
-        :param int verbose: Output verbosity.
+        :param int verbosity: Output verbosity.
         :param Console|None console: Console to write.
         """
-        self.verbose = verbose
+        self.verbosity = verbosity
         self.console = console or STDOUT
 
     def __call__(self, ctx):
@@ -53,21 +58,29 @@ class PrettyJournal:
 
         :param TurnContext ctx: Context of the dialog turn.
         """
-        self.console.line()
-        self.print_dialog(ctx.dialog)
-        if ctx.message:
-            self.print_message(ctx.message)
-        if ctx.rpc:
-            self.print_rpc(asdict(ctx.rpc.request))
-        if ctx.commands:
-            self.print_commands(ctx.commands, ctx.command_schema)
-        if self.verbose >= self.VerbosityLevel.NLU:
-            self.print_intents(ctx.intents)
-            if ctx.entities.all_objects:
-                self.print_entities(ctx.entities)
-        if ctx.journal_events:
-            self.print_journal_events(ctx.journal_events)
-        if ctx.error:
+        if self.verbosity >= self.VerbosityLevel.INFO:
+            self.console.line()
+            self.print_dialog(ctx.dialog)
+            if ctx.message:
+                self.print_message(ctx.message)
+            if ctx.rpc:
+                self.print_rpc(asdict(ctx.rpc.request))
+            if ctx.commands:
+                self.print_commands(ctx.commands, ctx.command_schema)
+            if self.verbosity >= self.VerbosityLevel.NLU:
+                self.print_intents(ctx.intents)
+                if ctx.entities.all_objects:
+                    self.print_entities(ctx.entities)
+            if ctx.journal_events:
+                self.print_journal_events(ctx.journal_events)
+            if ctx.error:
+                self.print_error(ctx.error)
+            if self.verbosity >= self.VerbosityLevel.VAR_FULL or (
+                ctx.error and self.verbosity >= self.VerbosityLevel.VAR_DIFF
+            ):
+                self.print_var_full(ctx.state)
+        elif ctx.error:
+            self.console.line()
             self.print_error(ctx.error)
 
     def print_dialog(self, dialog):
@@ -170,25 +183,33 @@ class PrettyJournal:
 
         :param list[dict] journal_events: Journal.
         """
-        verbose_journal = self.verbose >= self.VerbosityLevel.JOURNAL
-        output = Table.grid(padding=(0, 1))
-        output.title = "journal_events" if verbose_journal else "logs"
-        output.title_justify = "left"
-        output.expand = True
-        output.add_column()
-        output.add_column(ratio=1)
+        extractors = [
+            self._extract_log_event,
+        ]
+        if self.verbosity >= self.VerbosityLevel.VAR_DIFF:
+            extractors.append(self._extract_user_diff)
+            extractors.append(self._extract_slots_diff)
+        if self.verbosity >= self.VerbosityLevel.JOURNAL:
+            extractors.append(self._extract_journal_event)
+
+        table = Table.grid(padding=(0, 1))
+        table.title = "journal_events" if len(extractors) > 1 else "logs"
+        table.title_justify = "left"
+        table.expand = True
+        table.add_column()
+        table.add_column(ratio=1)
+
+        table_is_empty = True
         for event in journal_events:
-            level, message = self._extract_log_event(event)
-            if level:
-                if not isinstance(message, str):
-                    message = Pretty(message, indent_size=2, indent_guides=True)
-                output.add_row(self._LOG_LEVELS[level.upper()], message)
-            elif verbose_journal:
-                output.add_row(
-                    Text.styled(event.get("type", "?"), "yellow"),
-                    _yaml_syntax(event.get("payload")),
-                )
-        self.console.print(output)
+            for e in extractors:
+                first, second = e(event)
+                if first:
+                    table.add_row(first, second)
+                    table_is_empty = False
+                    break
+
+        if not table_is_empty:
+            self.console.print(table)
 
     def print_error(self, exc):
         """Print bot error.
@@ -200,6 +221,29 @@ class PrettyJournal:
         for snippet in exc.snippets:
             message.extend(bot_error_snippet(snippet))
         self._print_log("ERROR", message)
+
+    def print_var_full(self, state):
+        """Print snapshot of slots.* and user.*.
+
+        :param StateVariables state: Container of variables.
+        """
+        self._print_full(state, "slots")
+        self._print_full(state, "user")
+
+    def _print_full(self, state, field_name):
+        d = getattr(state, field_name)
+        if d:
+            table = Table.grid(padding=(0, 1))
+            table.title = field_name
+            table.title_justify = "left"
+            table.expand = True
+            table.add_column()
+            table.add_column(ratio=1)
+
+            for name, value in d.items():
+                table.add_row(Text.styled(f".{name}", "bold"), _yaml_syntax(value))
+
+            self.console.print(table)
 
     def _print_speech(self, speaker, data, lexer=None):
         output = Table.grid(padding=(0, 1))
@@ -231,7 +275,34 @@ class PrettyJournal:
 
     def _extract_log_event(self, event):
         level, message = TurnContext.extract_log_event(event)
-        return (level, message) if level in self._LOG_LEVELS else (None, None)
+        level = self._LOG_LEVELS.get(level.upper()) if isinstance(level, str) else None
+        if not isinstance(message, str):
+            message = Pretty(message, indent_size=2, indent_guides=True)
+        return (level, message) if level else (None, None)
+
+    def _extract_user_diff(self, event):
+        return self._extract_diff(event, "user")
+
+    def _extract_slots_diff(self, event):
+        return self._extract_diff(event, "slots")
+
+    def _extract_diff(self, event, kind):
+        t, p = event.get("type"), event.get("payload")
+        if isinstance(p, dict):
+            if t == "assign":
+                name, value = p.get(kind), p.get("value")
+                if isinstance(name, str):
+                    return Text.styled(f"{kind}.{name} =", "green"), Pretty(
+                        value, indent_size=2, indent_guides=True
+                    )
+            elif t == "delete":
+                name = p.get(kind)
+                if isinstance(name, str):
+                    return Text.styled("❌ delete", "red"), Text.styled(f"{kind}.{name}", "bold")
+        return None, None
+
+    def _extract_journal_event(self, event):
+        return Text.styled(event.get("type", "?"), "yellow"), _yaml_syntax(event.get("payload"))
 
 
 class ConsoleLogHandler(RichHandler):
@@ -256,7 +327,7 @@ class ConsoleLogHandler(RichHandler):
     def __init__(self):
         """Create new class instance."""
         super().__init__(console=STDERR, show_time=False, show_path=False)
-        self.setFormatter(logging.Formatter("%(message)s"))
+        self.setFormatter(logging.Formatter("%(asctime)s - %(processName)s - %(message)s"))
 
     def get_level_text(self, record):
         """Render the level prefix for log record.

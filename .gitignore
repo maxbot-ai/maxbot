@@ -6,7 +6,7 @@ syntax: glob
 .settings
 .classpath
 .pydevproject
-.coverage
+.coverage*
 .pytest_cache
 .env*
 htmlcov

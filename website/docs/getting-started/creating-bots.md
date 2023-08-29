@@ -144,7 +144,7 @@ These are called "flow collections" and can sometimes be useful.
 
 ## Channels
 
-Channels are a way to integrate your bot with various messaging platforms. You must configure at least one channel to create a bot. MaxBot provides pre-built channels for Telegram, Viber Chatbots, VKontakte and there will be more soon.
+Channels are a way to integrate your bot with various messaging platforms. You must configure at least one channel to create a bot. MaxBot provides pre-built channels for `Telegram`, `Viber Chatbots`, `VK` and there will be more soon.
 
 Just add the channel configuration to the bot resources to integrate the bot with that channel. The process of integrating your bot with a specific messaging platform is covered in the schema description of the corresponding channel. For example, [TelegramSchema](/design-reference/resources.md#telegramschema) description says that you should go to [@BotFacther](https://t.me/botfather), get an API token and specify it in the bot resources.
 
@@ -153,7 +153,7 @@ channels:
   telegram:
     api_token: 110201543:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw
 ```
-
+See [Channel settings](/design-guides/channel-setting) for information about other channels.
 ## Intents
 
 Intents are purposes or goals that are expressed in a user input, such as answering a question or making a reservation. By recognizing the intent expressed in a user's input, the bot can choose the correct dialog flow for responding to it. For example, you might want to define `intents.buy_something` intent to recognize when the user wants to make a purchase.
@@ -200,6 +200,15 @@ Rule-based entities cover commonly used categories, such as numbers or dates. Yo
 
 Phrase and regex entities are defined in bot resources. An entity definition includes a set of entity values that represent vocabulary that is often used in the context of a given intent. For each value, you define a set of recognition rules, which can be either phrases or regular expressions.
 
+You can also save entities values to variables. There are two kinds of state variables:
+
+* Slot variables are used by the bot as short-term memory to keep the conversation on the current topic only.
+* User variables are long-term memory that is used to personalize the entire communication process.
+
+State variables are used to retaining information across dialog turns. Use state variables to collect information from the user and then refer back to it later in the conversation.
+
+For more information about state variables, see [State Variables](/design-guides/state.md) guide.
+
 ### Phrase Entities {#phrase-entities}
 
 You define an entity (`entities.menu`), and then one or more values for that entity (`standard`, `vegetarian`, `cake`). For each value, you specify a bunch of phrases with which this value can be mentioned in the user input, e.g. "cake shop", "desserts" and "bakery offerings" for the `cake` value etc.
@@ -230,6 +239,7 @@ dialog:
 ```
 
 MaxBot recognizes pieces of information in the user input that closely match the phrases that you defined for the entity as mentions of that entity.
+MaxBot performs a comparison of phrases on tokens, which are extracted on the basis of linguistic features of a particular language, [details](https://spacy.io/usage/linguistic-features#tokenization).
 
 ### Regex Entities {#regex-entities}
 
@@ -249,7 +259,7 @@ entities:
 
 Note, that we use single-quoted strings to specify regular expressions. This avoids escaping mess when your string contains a lot of backslashes.
 
-MaxBot looks for patterns matching your regular expression in the user input, and identifies any matches as mentions of that entity.
+MaxBot performs a character-by-character comparison with a template, and identifies any matches as mentions of that entity.
 
 ### Using entities
 
@@ -365,7 +375,7 @@ Use the syntax `entities.city.boston` to trigger node when *the entity value* is
 
 The node is used if the state variable expression that you specify is true. Use the syntax with [comparison operators](/design-reference/booleans.md#comparisons) like, `dialog.channel_name == "telegram"` or `slots.guests > 5`.
 
-Make sure state variables are initialized before usage, otherwise use them with the [default filter](/design-reference/jinja.md#filter-default): `slots.counter|default(0) > 1`.
+Make sure state variables are initialized before usage (see [State Variables](/design-guides/state.md)), otherwise use them with the [default filter](/design-reference/jinja.md#filter-default): `slots.counter|default(0) > 1`.
 
 For node conditions, state variables is typically used with an `and` operator and another condition value because something in the user input must trigger the node.
 
@@ -400,7 +410,7 @@ See [Protocol](/design-reference/protocol.md) reference to learn more about diff
 
 The `true` condition is always evaluated to true. You can use it at the end of a list of nodes to catch any requests that did not match any of the previous conditions.
 
-The `message` expression is used in to trigger node if the MaxBot receives the *any type of message* from the user, i.e. text message, image file, button click, etc. This is the opposite of `rpc` methods, which are called by integrations and not by users.
+The `message` expression is used in to trigger node if the MaxBot receives the *any type of message* from the user, i.e. text message, image file, button click, etc. This is the opposite of [`RPC`](/design-guides/rpc) (remote procedure call) methods, which are called by integrations and not by users.
 
 ```yaml
 - condition: message

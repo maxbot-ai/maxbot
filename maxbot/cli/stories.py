@@ -1,4 +1,5 @@
 """Command `stories` of bots."""
+import asyncio
 import pprint
 from datetime import timedelta, timezone
 from pathlib import Path
@@ -41,13 +42,22 @@ def stories(bot_spec, stories_file):
     try:
         markup.Value.COMPARATOR = markup_value_rendered_comparator
         if stories_file:
-            return _stories_impl(bot, stories_file)
-        return _stories_impl(bot, Path(bot.resources.base_directory) / "stories.yaml")
+            asyncio.run(_stories_impl(bot, stories_file))
+        elif hasattr(bot.resources, "base_directory"):
+            asyncio.run(_stories_impl(bot, Path(bot.resources.base_directory) / "stories.yaml"))
+        else:
+            raise click.BadParameter(
+                (
+                    "stories file cannot be defined, "
+                    "explicit specification of parameter --stories/-S is required."
+                ),
+                param_hint="--bot",
+            )
     finally:
         markup.Value.COMPARATOR = original_comparator
 
 
-def _stories_impl(bot, stories_file):
+async def _stories_impl(bot, stories_file):
     console = Console()
     command_schema = bot.dialog_manager.CommandSchema(many=True)
     bot.dialog_manager.utc_time_provider = StoryUtcTimeProvider()
@@ -60,12 +70,17 @@ def _stories_impl(bot, stories_file):
         for i, turn in enumerate(story["turns"]):
             bot.dialog_manager.utc_time_provider.tick(turn.get("utc_time"))
 
-            if "message" in turn:
-                response = bot.process_message(turn["message"], dialog)
-            elif "rpc" in turn:
-                response = bot.process_rpc(turn["rpc"], dialog)
-            else:
-                raise AssertionError("Either message or rpc must be provided.")
+            with bot.persistence_manager(dialog) as tracker:
+                if "message" in turn:
+                    response = await bot.dialog_manager.process_message(
+                        turn["message"], dialog, tracker.get_state()
+                    )
+                elif "rpc" in turn:
+                    response = await bot.dialog_manager.process_rpc(
+                        turn["rpc"], dialog, tracker.get_state()
+                    )
+                else:
+                    raise AssertionError("Either message or rpc must be provided.")
 
             for expected in turn["response"]:
                 if command_schema.loads(expected) == response:

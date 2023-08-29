@@ -1,49 +1,63 @@
 """Bot journals."""
 import json
 import os
+import sys
 from dataclasses import asdict
 
 from ..maxml import pretty
 from ._yaml_dumper import yaml_frendly_dumps
 
 
-def create_journal(verbose, quiet, journal_file, journal_output):
+def create_journal(verbosity, journal_file, journal_output):
     """Create bot journal from provided specification.
 
-    :param int verbose: Verbose level.
-    :param bool quiet: Do not log to console.
+    :param int verbosity: Verbose level.
     :param file journal_file: Logging to the file.
     :param str journal_output: File journal output format ("json" or "yaml").
     """
-    journal = JournalChain()
-    if not quiet:
-        from ._rich import PrettyJournal  # speed up loading time
+    if verbosity < -1:
+        return no_journal
 
-        journal.chain.append(PrettyJournal(verbose))
+    if not journal_file and _stdout_is_non_interactive():
+        journal_file = sys.stdout
+
     if journal_file:
-        journal.chain.append(
-            FileJournal(
-                journal_file,
-                {"json": Dumper.json_line, "yaml": Dumper.yaml_triple_dash}[journal_output],
-            )
+        journal_class = FileQuietJournal if verbosity < 0 else FileJournal
+        return journal_class(
+            journal_file,
+            {"json": Dumper.json_line, "yaml": Dumper.yaml_triple_dash}[journal_output],
         )
-    return journal
+
+    from ._rich import PrettyJournal  # speed up loading time
+
+    return PrettyJournal(verbosity)
 
 
-class JournalChain:
-    """Sequentially call several journals."""
+def no_journal(ctx):
+    """Silent journal."""
+    return
 
-    def __init__(self, chain=None):
-        """Create class instance."""
-        self.chain = chain or []
+
+class FileQuietJournal:
+    """Error logging only."""
+
+    def __init__(self, f, dumps):
+        """Create class instance.
+
+        :param file f: Target file to write.
+        :dump callable dumps: Dump object to string.
+        """
+        self.f = f
+        self.dumps = dumps
 
     def __call__(self, ctx):
-        """Process turn context.
+        """Write turn context.
 
         :param TurnContext ctx: Context of the dialog turn.
         """
-        for journal in self.chain:
-            journal(ctx)
+        if ctx.error:
+            self.f.write(self.dumps({"error": {"message": ctx.error.message}}))
+            self.f.flush()
 
 
 class FileJournal:
@@ -102,4 +116,8 @@ class Dumper:
     @staticmethod
     def yaml_triple_dash(data):
         """Dump object to YAML with three dashes (`---`) at end."""
-        return yaml_frendly_dumps(data) + "---" + os.linesep
+        return yaml_frendly_dumps(data, aliases_allowed=False) + "---" + os.linesep
+
+
+def _stdout_is_non_interactive():
+    return not sys.stdout.isatty()

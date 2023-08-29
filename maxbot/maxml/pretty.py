@@ -29,7 +29,7 @@ class _XmlPrinter:
         self._write_element_markup_headless(level, name, value)
 
     def _write_element_markup_headless(self, level, name, value):
-        lines = _markup_to_lines(value)
+        lines = markup_to_lines(value)
         if len(lines) > 1:
             self._result.write(self._newline)
             for line in lines:
@@ -135,7 +135,12 @@ class _Lines:
         self._new_line = True
 
 
-def _markup_to_lines(value):
+def markup_to_lines(value):
+    """Print markup value to list of strings.
+
+    :param markup.Value value: Markup value.
+    :return list[str]: XML-escaped lines.
+    """
     lines = _Lines()
     for i, item in enumerate(value.items):
         if item.kind == markup.START_TAG:

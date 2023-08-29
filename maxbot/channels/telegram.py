@@ -6,8 +6,9 @@ from urllib.parse import urljoin
 
 import httpx
 from telegram import Bot, Update
+from telegram.request import HTTPXRequest
 
-from ..maxml import Schema, fields
+from ..maxml import PoolLimitSchema, Schema, TimeoutSchema, fields
 
 TG_FILE_URL = "https://api.telegram.org/file"
 
@@ -31,7 +32,51 @@ class TelegramChannel:
         # @see https://core.telegram.org/bots#6-botfather.
         api_token = fields.Str(required=True)
 
-    httpx_client = httpx.AsyncClient(timeout=3)
+        # Default HTTP request timeouts
+        # @see https://www.python-httpx.org/advanced/#timeout-configuration
+        timeout = fields.Nested(TimeoutSchema())
+
+        # Pool limit configuration
+        # @see https://www.python-httpx.org/advanced/#pool-limit-configuration
+        limits = fields.Nested(PoolLimitSchema())
+
+    class Request(HTTPXRequest):
+        """Local implementation of telegram.request.HTTPXRequest."""
+
+        def __init__(self, timeout, limits):  # pylint: disable=super-init-not-called
+            """Create new instance.
+
+            :param httpx.Timeout timeout: HTTPX client timeout.
+            :param httpx.Limits limits: HTTPX client limits.
+            """
+            self._http_version = "1.1"
+            self._client_kwargs = {
+                "timeout": timeout,
+                "proxies": None,
+                "limits": limits,
+                "http1": True,
+                "http2": False,
+            }
+            self._client = self._build_client()
+
+    def create_request(self):
+        """Create new instance of `telegram.request.BaseRequest` implementation."""
+        return self.Request(self.timeout, self.limits)
+
+    @cached_property
+    def timeout(self):
+        """Create `httpx.Timeout` from channel configuration."""
+        return self.config.get("timeout", TimeoutSchema.DEFAULT)
+
+    @cached_property
+    def limits(self):
+        """Create `httpx.Limits` from channel configuration."""
+        return self.config.get("limits", PoolLimitSchema.DEFAULT)
+
+    @cached_property
+    def httpx_client(self):
+        """Create HTTPX asynchronous client."""
+        return httpx.AsyncClient(timeout=self.timeout, limits=self.limits)
 
     @cached_property
     def bot(self):
@@ -41,7 +86,11 @@ class TelegramChannel:
 
         :return Bot:
         """
-        return Bot(self.config["api_token"])
+        return Bot(
+            self.config["api_token"],
+            get_updates_request=self.create_request(),
+            request=self.create_request(),
+        )
 
     async def create_dialog(self, update: Update):
         """Create a dialog object from the incomming update.
@@ -124,10 +173,11 @@ class TelegramChannel:
                 dialog["user_id"], image["url"], None if caption is None else caption.render()
             )
 
-    def blueprint(self, callback, public_url=None, webhook_path=None):
+    def blueprint(self, callback, execute_once, public_url=None, webhook_path=None):
         """Create web application blueprint to receive incoming updates.
 
         :param callable callback: a callback for received messages.
+        :param callable execute_once: Execute only for first WEB application worker.
         :param string public_url: Base url to register webhook.
         :param string webhook_path: An url path to receive incoming updates.
         :return Blueprint: Blueprint for sanic app.
@@ -142,6 +192,7 @@ class TelegramChannel:
 
         @bp.post(webhook_path)
         async def webhook(request):
+            logger.debug("%s", request.json)
             update = Update.de_json(data=request.json, bot=self.bot)
             await callback(update, self)
             return empty()
@@ -150,8 +201,11 @@ class TelegramChannel:
 
             @bp.after_server_start
             async def register_webhook(app, loop):
-                webhook_url = urljoin(public_url, webhook_path)
-                await self.bot.setWebhook(webhook_url)
-                logger.info(f"Registered webhook {webhook_url}.")
+                async def _impl():
+                    webhook_url = urljoin(public_url, webhook_path)
+                    await self.bot.setWebhook(webhook_url)
+                    logger.info(f"Registered webhook {webhook_url}.")
+
+                await execute_once(app, _impl)
 
         return bp

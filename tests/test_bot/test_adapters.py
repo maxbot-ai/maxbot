@@ -72,11 +72,53 @@ async def test_default_rpc_adapter(bot, channel):
     assert channel.sent == ["hello world"]
 
 
-async def test_state_store(channel):
+async def test_persistence_manager(channel):
     mock = MagicMock()
-    bot = MaxBot(state_store=Mock(return_value=mock))
+    bot = MaxBot(persistence_manager=Mock(return_value=mock))
     await bot.default_channel_adapter("hey bot", channel)
 
-    bot.state_store.assert_called_once_with({"channel_name": channel.name, "user_id": "23"})
+    bot.persistence_manager.assert_called_once_with(
+        {"channel_name": channel.name, "user_id": "23"}
+    )
     mock.__enter__.assert_called_once()
     mock.__exit__.assert_called_once()
+
+
+async def test_track_history_channel(channel):
+    tracker = MagicMock()
+    mock = MagicMock()
+    mock.__enter__ = Mock(return_value=tracker)
+    bot = MaxBot(persistence_manager=Mock(return_value=mock), history_tracked=True)
+    await bot.default_channel_adapter("hey bot", channel)
+
+    tracker.set_message_history.assert_called_once()
+
+
+async def test_track_history_rpc(channel):
+    tracker = MagicMock()
+    mock = MagicMock()
+    mock.__enter__ = Mock(return_value=tracker)
+    bot = MaxBot(persistence_manager=Mock(return_value=mock), history_tracked=True)
+    await bot.default_rpc_adapter({}, channel, "34")
+
+    tracker.set_rpc_history.assert_called_once()
+
+
+async def test_track_history_channel_default(channel):
+    tracker = MagicMock()
+    mock = MagicMock()
+    mock.__enter__ = Mock(return_value=tracker)
+    bot = MaxBot(persistence_manager=Mock(return_value=mock))
+    await bot.default_channel_adapter("hey bot", channel)
+
+    tracker.set_message_history.assert_not_called()
+
+
+async def test_track_history_rpc_default(channel):
+    tracker = MagicMock()
+    mock = MagicMock()
+    mock.__enter__ = Mock(return_value=tracker)
+    bot = MaxBot(persistence_manager=Mock(return_value=mock))
+    await bot.default_rpc_adapter({}, channel, "34")
+
+    tracker.set_rpc_history.assert_not_called()

@@ -19,7 +19,7 @@ def make_context(state=None, intents=None, entities=None):
         message={"text": "hello"},
         intents=IntentsResult.resolve(intents or []),
         entities=entities or EntitiesResult(),
-        state=StateVariables(slots={}, components={"xxx": state} if state else {}),
+        state=StateVariables(components={"xxx": state} if state else {}),
     )
     return ctx, ctx.state.components.setdefault("xxx", {})
 

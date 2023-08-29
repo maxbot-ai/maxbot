@@ -53,6 +53,9 @@ class DialogFlow:
         try:
             result = await self._root_component(ctx)
         except BotError as exc:
+            ctx.warning(
+                "An error has occurred. The dialog will be reset (including the slot values)."
+            )
             ctx.set_error(exc)
             result = FlowResult.DONE
 

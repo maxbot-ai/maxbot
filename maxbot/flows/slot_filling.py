@@ -233,6 +233,7 @@ class Turn:
             value = True
         logger.debug("elicit slot %r value %r", slot.name, value)
         previous_value = self.ctx.state.slots.get(slot.name)
+        self.ctx.journal_event("slot_filling", {"slot": slot.name})
         self.ctx.state.slots[slot.name] = value
         self.found_slots.append((slot, {"previous_value": previous_value, "current_value": value}))
 
@@ -343,9 +344,6 @@ class Turn:
             self.elicit(slot)
         # found
         for slot, params in self.found_slots:
-            self.ctx.journal_event(
-                "slot_filling", {"slot": slot.name, "value": params["current_value"]}
-            )
             if slot.found:
                 await self.found(slot, params)
         if self.state.get("slot_in_focus") and not self.found_slots:

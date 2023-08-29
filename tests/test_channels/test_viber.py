@@ -142,7 +142,7 @@ async def test_sanic_endpoint(bot, respx_mock):
     callback = AsyncMock()
 
     app = Sanic(__name__)
-    app.blueprint(bot.channels.viber.blueprint(callback))
+    app.blueprint(bot.channels.viber.blueprint(callback, None))
     _, response = await app.asgi_client.post("/viber", json=UPDATE_TEXT)
     assert response.status_code == 204, response.text
     assert response.text == ""
@@ -155,7 +155,10 @@ async def test_sanic_register_webhook(bot, respx_mock, monkeypatch):
     respx_mock.post(f"{API_URL}/set_webhook").respond(json={"status": 0, "event_types": []})
     monkeypatch.setattr(Blueprint, "after_server_start", Mock())
 
-    bp = bot.channels.viber.blueprint(AsyncMock(), public_url="https://example.com/")
+    async def execute_once(app, fn):
+        await fn()
+
+    bp = bot.channels.viber.blueprint(AsyncMock(), execute_once, public_url="https://example.com/")
     for call in bp.after_server_start.call_args_list:
         (coro,) = call.args
         await coro(Mock(), Mock())
@@ -196,3 +199,55 @@ async def test_get_avatar_and_name(dialog, respx_mock):
         "receiver": USER_ID,
         "sender": {"name": name, "avatar": avatar},
     }
+
+
+async def test_timeout_not_specified(bot, dialog, respx_mock):
+    respx_mock.post(f"{API_URL}/send_message").respond(json={"status": 0, "message_token": "11"})
+
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.viber.call_senders({"text": text}, dialog)
+
+    assert [c.request.extensions["timeout"] for c in respx_mock.calls] == [
+        {"connect": 5.0, "pool": 5.0, "read": 5.0, "write": 5.0},
+    ]
+
+
+async def test_timeout(dialog, respx_mock):
+    bot = MaxBot.inline(
+        f"""
+        channels:
+            viber:
+                api_token: {API_TOKEN}
+                avatar:  {DEFAULT_AVATAR}
+                name: MAXBOT
+                timeout:
+                    default: 3.1
+                    connect: 10
+    """
+    )
+    respx_mock.post(f"{API_URL}/send_message").respond(json={"status": 0, "message_token": "11"})
+
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.viber.call_senders({"text": text}, dialog)
+
+    assert [c.request.extensions["timeout"] for c in respx_mock.calls] == [
+        {"connect": 10, "pool": 3.1, "read": 3.1, "write": 3.1},
+    ]
+
+
+async def test_limits():
+    MaxBot.inline(
+        f"""
+        channels:
+            viber:
+                api_token: {API_TOKEN}
+                avatar:  {DEFAULT_AVATAR}
+                name: MAXBOT
+                limits:
+                  max_keepalive_connections: 1
+                  max_connections: 2
+                  keepalive_expiry: 3
+    """
+    )

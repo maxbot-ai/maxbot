@@ -166,6 +166,11 @@ def test_dateparser_entities(spacy_nlp):
     assert time.value == "18:00:00"
     assert time.literal == "February 22, 2022 at 6pm"
 
+    (date,) = entity_recognizer(spacy_nlp("1984"))
+    assert date.name == "latent_date"
+    assert date.value.startswith("1984-")
+    assert date.literal == "1984"
+
 
 @freeze_time("2023-04-08")
 def test_dateparser_entities_prefer_future(spacy_nlp):

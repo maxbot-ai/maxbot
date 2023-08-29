@@ -193,3 +193,9 @@ builder.use_inline_resources("""
 """)
 bot = builder.build()
 ```
+
+## Webhooks
+
+Channels can receive data in two modes: webhook and polling. Polling means that the bot polls the server at some intervals to see if there are any changes. Please note: only the built-in `telegram` channel can run in polling mode. Webhook mode means that the bot has an external web address that will be called when there is new data from the messenger.
+
+The processing time of an incoming webhook request is limited. We recommend completing the handling within 5 seconds. Keep in mind that if you take too long to process a message from a user, the messenger may resend the same message. In order not to process the same message again, it will be necessary to check the identifiers of the processed messages. This code can be represented as `middleware` and, for example, use a database as storage.

@@ -132,3 +132,18 @@ async def test_autoreload(tmp_path, post_init, post_stop):
 
     await post_stop()
     assert task.cancelled()
+
+
+async def test_timeout(bot, monkeypatch):
+    app = None
+
+    def run_polling(self):
+        nonlocal app
+        app = self
+
+    monkeypatch.setattr(Application, "run_polling", run_polling)
+
+    bot.run_polling()
+
+    assert app.bot._request[0]._client_kwargs["timeout"] == bot.channels.telegram.timeout
+    assert app.bot._request[1]._client_kwargs["timeout"] == bot.channels.telegram.timeout

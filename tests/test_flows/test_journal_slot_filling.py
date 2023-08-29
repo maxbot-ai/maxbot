@@ -10,7 +10,7 @@ def make_context(state=None):
         dialog=None,
         message={"text": "hello"},
         entities=EntitiesResult(),
-        state=StateVariables(slots={}, components={"xxx": state} if state else {}),
+        state=StateVariables(components={"xxx": state} if state else {}),
     )
     return ctx, ctx.state.components.setdefault("xxx", {})
 
@@ -27,8 +27,9 @@ async def test_journal_slot_filling():
     )
     ctx, state = make_context()
     await model(ctx, state)
-    (event,) = ctx.journal_events
-    assert event == {"type": "slot_filling", "payload": {"slot": "slot1", "value": True}}
+    event1, event2 = ctx.journal_events
+    assert event1 == {"type": "slot_filling", "payload": {"slot": "slot1"}}
+    assert event2 == {"type": "assign", "payload": {"slots": "slot1", "value": True}}
 
 
 async def test_journal_found():
@@ -45,6 +46,7 @@ async def test_journal_found():
     ctx, state = make_context()
     await model(ctx, state)
     (
+        _,
         _,
         event,
     ) = ctx.journal_events
@@ -68,10 +70,7 @@ async def test_journal_found_control_command(control_command):
     )
     ctx, state = make_context()
     await model(ctx, state)
-    (
-        _,
-        event,
-    ) = ctx.journal_events
+    event = ctx.journal_events[2]  # slot_filling, assing, <EVENT>[, delete]
     assert event == {
         "type": "found",
         "payload": {"slot": "slot1", "control_command": control_command},

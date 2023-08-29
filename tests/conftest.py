@@ -8,6 +8,7 @@ from sanic import Sanic
 from maxbot.context import StateVariables
 from maxbot.errors import YamlSymbols
 
+pytest_plugins = "pytester"
 Sanic.test_mode = True
 
 

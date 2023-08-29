@@ -25,7 +25,9 @@ def pkgdir(botfile, monkeypatch):
 def test_from_file(runner, botfile, monkeypatch):
     monkeypatch.setattr(Sanic, "run", Mock())
 
-    result = runner.invoke(maxbot.cli.main, ["run", "--bot", botfile], catch_exceptions=False)
+    result = runner.invoke(
+        maxbot.cli.main, ["run", "--bot", botfile, "--single-process"], catch_exceptions=False
+    )
     assert result.exit_code == 0, result.output
     assert Sanic.run.call_count == 1
 
@@ -35,7 +37,9 @@ def test_custom_filename(runner, botfile, monkeypatch):
     botfile.rename(customfile)
     monkeypatch.setattr(Sanic, "run", Mock())
 
-    result = runner.invoke(maxbot.cli.main, ["run", "--bot", customfile], catch_exceptions=False)
+    result = runner.invoke(
+        maxbot.cli.main, ["run", "--bot", customfile, "--single-process"], catch_exceptions=False
+    )
     assert result.exit_code == 0, result.output
     assert Sanic.run.call_count == 1
 
@@ -50,7 +54,9 @@ def test_from_file_bot_error(runner, botfile, monkeypatch, caplog):
     )
 
     with caplog.at_level(logging.CRITICAL):
-        result = runner.invoke(maxbot.cli.main, ["run", "--bot", botfile], catch_exceptions=False)
+        result = runner.invoke(
+            maxbot.cli.main, ["run", "--bot", botfile, "--single-process"], catch_exceptions=False
+        )
     assert result.exit_code == 1, result.output
     assert "Invalid input type" in caplog.text
     assert "    dialog: XXX" in caplog.text
@@ -60,7 +66,9 @@ def test_from_directory(runner, botfile, monkeypatch):
     monkeypatch.setattr(Sanic, "run", Mock())
 
     result = runner.invoke(
-        maxbot.cli.main, ["run", "--bot", botfile.parent], catch_exceptions=False
+        maxbot.cli.main,
+        ["run", "--bot", botfile.parent, "--single-process"],
+        catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
     assert Sanic.run.call_count == 1
@@ -69,7 +77,9 @@ def test_from_directory(runner, botfile, monkeypatch):
 def test_package(runner, pkgdir, monkeypatch):
     monkeypatch.setattr(Sanic, "run", Mock())
 
-    result = runner.invoke(maxbot.cli.main, ["run", "--bot", pkgdir.name], catch_exceptions=False)
+    result = runner.invoke(
+        maxbot.cli.main, ["run", "--bot", pkgdir.name, "--single-process"], catch_exceptions=False
+    )
     assert result.exit_code == 0, result.output
     assert Sanic.run.call_count == 1
 
@@ -86,7 +96,7 @@ def test_package_custom_bot_name(runner, pkgdir, monkeypatch):
 
     result = runner.invoke(
         maxbot.cli.main,
-        ["run", "--bot", f"{pkgdir.name}:custom_bot"],
+        ["run", "--bot", f"{pkgdir.name}:custom_bot", "--single-process"],
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output

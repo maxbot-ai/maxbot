@@ -1,5 +1,6 @@
 """The context of the dialog turns."""
 import logging
+from collections.abc import MutableMapping
 from dataclasses import dataclass, field, fields
 from datetime import datetime, timezone
 from operator import attrgetter
@@ -312,15 +313,61 @@ class EntitiesResult:
                 yield name, _ReprAsIs("EntitiesProxy(...)")
 
 
+class JournalledDict(MutableMapping):
+    """Wraps a dictionary of state variables to journal their changes."""
+
+    def __init__(self):
+        """Create a class instance.
+
+        You cannot change the object before calling `set_journal_event_function` method.
+        """
+        self.__impl = {}
+        self.__journal_event = None
+        self.__journal_event_name = None
+
+    def set_journal_event_function(self, journal_event, name):
+        """Start of journaling.
+
+        :param callable journal_event: Journaling function.
+        :param str name: Kind name.
+        """
+        self.__journal_event = journal_event
+        self.__journal_event_name = name
+
+    def __getitem__(self, name):
+        """Abstract method of MutableMapping implementation."""
+        return self.__impl[name]
+
+    def __setitem__(self, name, value):
+        """Abstract method of MutableMapping implementation."""
+        self.__impl[name] = value
+        if self.__journal_event:
+            self.__journal_event("assign", {self.__journal_event_name: name, "value": value})
+
+    def __delitem__(self, name):
+        """Abstract method of MutableMapping implementation."""
+        del self.__impl[name]
+        if self.__journal_event:
+            self.__journal_event("delete", {self.__journal_event_name: name})
+
+    def __iter__(self):
+        """Abstract method of MutableMapping implementation."""
+        return iter(self.__impl)
+
+    def __len__(self):
+        """Abstract method of MutableMapping implementation."""
+        return len(self.__impl)
+
+
 @dataclass(frozen=True)
 class StateVariables:
     """A container for state variables loaded by state tracker."""
 
     # User variables that live forever.
-    user: dict = field(default_factory=dict)
+    user: JournalledDict = field(default_factory=JournalledDict)
 
     # Skill variables that live during discussing a topic.
-    slots: dict = field(default_factory=dict)
+    slots: JournalledDict = field(default_factory=JournalledDict)
 
     # Private variables used by **maxbot** internal components.
     components: dict = field(default_factory=dict)
@@ -351,7 +398,7 @@ class StateVariables:
         :return StateVariables:
         :raise ValueError: Meet unknown namespace.
         """
-        data = {f.name: {} for f in fields(cls)}
+        data = {f.name: f.default_factory() for f in fields(cls)}
         for name, value in kv_pairs:
             ns, name = name.split(".", 1)
             if ns not in data:
@@ -484,8 +531,14 @@ class TurnContext:
     error: Optional[BotError] = field(default=None, init=False)
 
     def __post_init__(self):
-        """Make sure that turn is either foreground or background which is mutually exclusive."""
+        """Make sure that turn is either foreground or background which is mutually exclusive.
+
+        And pre-initialization `.state` field.
+        """
         assert bool(self.message) != bool(self.rpc)
+
+        self.state.slots.set_journal_event_function(self.journal_event, "slots")
+        self.state.user.set_journal_event_function(self.journal_event, "user")
 
     def get_state_variable(self, key):
         """Get state variable for the component.

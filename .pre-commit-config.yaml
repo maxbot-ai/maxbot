@@ -72,3 +72,4 @@ repos:
       entry: make test
       language: system
       always_run: True
+      pass_filenames: false

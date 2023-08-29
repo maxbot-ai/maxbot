@@ -127,6 +127,14 @@ Press `Ctrl-C` to exit MaxBot CLI app.
 
 Congratulations! You have successfully created and launched a simple bot and chatted with it.
 
+### Advanced examples
+
+There are several examples of services built on Maxbot. They show the advanced features of Maxbot, such as custom messanger controls, integration with different REST services, databases and so on. You can also check the implementation details of these features in the examples below.
+
+- [Bank Bot example](https://github.com/maxbot-ai/bank_bot).
+- [Taxi Bot example](https://github.com/maxbot-ai/taxi_bot).
+- [Transport Bot example](https://github.com/maxbot-ai/transport_bot).
+
 ## Where to ask questions
 
 The **Maxbot** project is maintained by the [Maxbot team](https://maxbot.ai).

@@ -380,12 +380,12 @@ class Turn:
         :param Node digressed_node: Node to switch from.
         :return FlowResult: The result of the turn of the flow.
         """
-        logger.debug("digression from %s", digressed_node)
+        self.journal_event("digression_from", digressed_node)
         for node in self.tree.root_nodes(self.ctx):
             if node == digressed_node:
                 continue
             if node.condition(self.ctx, digressing=True):
-                return await self.trigger_maybe_digressed(node)
+                return await self.trigger_maybe_digressed(node, digressing=True)
         if self.ctx.rpc:
             return FlowResult.LISTEN
         if digressed_node.followup_allow_return:
@@ -416,21 +416,23 @@ class Turn:
         # nowere to return
         return None
 
-    async def trigger_maybe_digressed(self, node):
+    async def trigger_maybe_digressed(self, node, digressing=False):
         """Trigger the node or return to the node after digression.
 
         :param Node node: Triggered node.
+        :param bool digressing: True if digression occurs.
         :return FlowResult: The result of the turn of the flow.
         """
         if self.stack.remove(node):
-            return await self.trigger(node, DigressionResult.FOUND)
-        return await self.trigger(node)
+            return await self.trigger(node, DigressionResult.FOUND, digressing=digressing)
+        return await self.trigger(node, digressing=digressing)
 
-    async def trigger(self, node, digression_result=None):
+    async def trigger(self, node, digression_result=None, digressing=False):
         """Go through the node's slot filling flow (if any) and/or execute its response scenario.
 
         :param Node node: Triggered node.
         :param DigressionResult digression_result: The result with which we return from digression.
+        :param bool digressing: True if digression occurs.
         :raise ValueError: Unknown slot filling result.
         :return FlowResult: The result of the turn of the flow.
         """
@@ -439,35 +441,44 @@ class Turn:
             result = await node.slot_filling(self.ctx, digression_result)
             if result == FlowResult.DONE:
                 self.stack.remove(node)
-                return await self.response(node, digression_result)
+                return await self.response(node, digression_result, digressing=digressing)
             if result == FlowResult.LISTEN:
                 self.stack.push(node, "slot_filling")
                 return FlowResult.LISTEN
             if result == FlowResult.DIGRESS:
                 return await self.digression(node)
             raise ValueError(f"Unknown flow result {result!r}")
-        return await self.response(node, digression_result)
+        return await self.response(node, digression_result, digressing=digressing)
 
-    async def response(self, node, digression_result):
+    async def response(self, node, digression_result, digressing=False):
         """Execute the response scenario of the node.
 
         :param Node node: Triggered node.
         :param DigressionResult digression_result: The result with which we return from digression.
+        :param bool digressing: True if digression occurs.
         :return FlowResult: The result of the turn of the flow.
         """
         payload = self.journal_event("response", node)
-        for command in await node.response(self.ctx, returning=digression_result is not None):
+        params = {"returning": digression_result is not None, "digressing": digressing}
+        for command in await node.response(self.ctx, **params):
             if "jump_to" in command:
-                payload.update(control_command="jump_to")
+                payload.update(
+                    control_command={
+                        "jump_to": {
+                            "node": command["jump_to"]["node"],
+                            "transition": command["jump_to"]["transition"],
+                        }
+                    }
+                )
                 return await self.command_jump_to(node, command["jump_to"])
             if "listen" in command:
-                payload.update(control_command="listen")
+                payload.update(control_command={"listen": {}})
                 return await self.command_listen(node)
             if "end" in command:
-                payload.update(control_command="end")
+                payload.update(control_command={"end": {}})
                 return self.command_end()
             if "followup" in command:
-                payload.update(control_command="followup")
+                payload.update(control_command={"followup": {}})
                 return await self.command_followup(node)
             self.ctx.commands.append(command)
         if node.followup:

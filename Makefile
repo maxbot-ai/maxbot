@@ -25,16 +25,16 @@ $(eval POETRY_VERSION_NEW=$(POETRY_VERSION_MAIN)$(POETRY_VERSION_NAME)$(POETRY_V
 .PHONY: test
 
 test:
-	pytest --cov=maxbot --cov-report html --cov-fail-under=95
+	pytest -p no:maxbot_stories --cov=maxbot --cov-report html --cov-fail-under=95
 
 stories:
-	maxbot stories -B examples/hello-world
-	maxbot stories -B examples/echo
-	maxbot stories -B examples/restaurant
-	maxbot stories -B examples/reservation-basic
-	maxbot stories -B examples/reservation
-	maxbot stories -B examples/digression-showcase
-	maxbot stories -B examples/rpc-showcase
+	pytest --bot examples/hello-world examples/hello-world/stories.yaml
+	pytest --bot examples/echo examples/echo/stories.yaml
+	pytest --bot examples/restaurant examples/restaurant/stories.yaml
+	pytest --bot examples/reservation-basic examples/reservation-basic/stories.yaml
+	pytest --bot examples/reservation examples/reservation/stories.yaml
+	pytest --bot examples/digression-showcase examples/digression-showcase/stories.yaml
+	pytest --bot examples/rpc-showcase examples/rpc-showcase/stories.yaml
 
 clean:
 	rm -f dist/maxbot-*.*.*-py3-none-any.whl

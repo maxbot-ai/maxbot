@@ -108,7 +108,7 @@ The bot will be available through the [Telegram Messenger](https://core.telegram
 To integrate with the messenger, contact [@BotFather](https://t.me/botfather) and ask it to create a bot for you and generate an API token. Then specify API token in the bot resources. Refer [official docs](https://core.telegram.org/bots#6-botfather) for more information about telegram bots.
 :::
 
-Save the bot resources as `bot.yaml` or something similar. Run the MaxBot CLI app passing the path to the `bot.yaml` as a parameter.
+Save the bot resources as `bot.yaml` or something similar. Run the MaxBot Command Line Interface (CLI) app passing the path to the `bot.yaml` as a parameter.
 
 ```bash
 $ maxbot run --bot bot.yaml
@@ -140,3 +140,12 @@ The output in your console will look like this
 Press `Ctrl-C` to exit MaxBot CLI app.
 
 Congratulations! You have successfully created and launched a simple bot and chatted with it.
+
+
+## Examples
+
+You can find a lot of basic bot examples in this reference. If you want to get more complex ones, check out the list of examples below. They show the advanced features of Maxbot, such as custom messanger controls, integration with different REST services, databases and so on.
+
+- [Bank Bot example](https://github.com/maxbot-ai/bank_bot).
+- [Taxi Bot example](https://github.com/maxbot-ai/taxi_bot).
+- [Transport Bot example](https://github.com/maxbot-ai/transport_bot).

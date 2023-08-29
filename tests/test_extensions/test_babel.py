@@ -209,6 +209,16 @@ def test_unknown_tz_config(utc_time, filter_name):
     )
 
 
+def test_format_time_str(utc_time):
+    assert _babel()["format_time"](utc_time.time().isoformat(), locale="en") == "12:00:00\u202fPM"
+
+
+def test_unknow_tz(utc_time):
+    with pytest.raises(BotError) as excinfo:
+        assert _babel()["format_datetime"](utc_time, tz="UnKnown", locale="en")
+    assert str(excinfo.value) == "caused by builtins.LookupError: unknown timezone 'UnKnown'"
+
+
 def _babel(config={}):
     builder = Mock()
     BabelExtension(builder, config)

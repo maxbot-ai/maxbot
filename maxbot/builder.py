@@ -39,13 +39,14 @@ class BotBuilder:
         self._bot_created = False
         self.resources = Resources.empty()
         self._user_locks = None
-        self._state_store = None
+        self._persistence_manager = None
         self._nlu = None
         self._message_schemas = {}
         self._command_schemas = {}
         self._before_turn_hooks = []
         self._after_turn_hooks = []
         self._middlewares = []
+        self._history_tracked = False
 
     def add_message(self, schema, name):
         """Register a custom message.
@@ -152,35 +153,37 @@ class BotBuilder:
         self._user_locks = value
 
     @property
-    def state_store(self):
-        """State store used to maintain state variables.
+    def persistence_manager(self):
+        """Return persistence manager.
 
-        See default implementation :class:`~maxbot.state_store.SQLAlchemyStateStore` for more information.
+        Used, for example, to save-restore state variables.
+
+        See default implementation :class:`~maxbot.persistence_manager.SQLAlchemyManager` for more information.
         You can use this property to configure default state tracker::
 
-            builder.state_store.engine = sqlalchemy.create_engine(...)
+            builder.persistence_manager.engine = sqlalchemy.create_engine(...)
 
         or set your own implementation::
 
-            class CustomStateStore:
+            class CustomPersistenceManager:
                 @contextmanager
                 def __call__(self, dialog):
                     # load variables...
                     yield StateVariables(...)
                     # save variables...
 
-            builder.state_store = CustomStateStore()
+            builder.persistence_manager = CustomPersistenceManager()
         """
-        if self._state_store is None:
+        if self._persistence_manager is None:
             # lazy import to speed up load time
-            from .state_store import SQLAlchemyStateStore
+            from .persistence_manager import SQLAlchemyManager
 
-            self._state_store = SQLAlchemyStateStore()
-        return self._state_store
+            self._persistence_manager = SQLAlchemyManager()
+        return self._persistence_manager
 
-    @state_store.setter
-    def state_store(self, value):
-        self._state_store = value
+    @persistence_manager.setter
+    def persistence_manager(self, value):
+        self._persistence_manager = value
 
     @property
     def nlu(self):
@@ -407,6 +410,10 @@ class BotBuilder:
         """
         self.resources = resources
 
+    def track_history(self, value=True):
+        """Set/reset flag that controls history recording."""
+        self._history_tracked = value
+
     def _create_dialog_manager(self):
         message_schema = self._create_message_schema()
         command_schema = self._create_command_schema()
@@ -449,7 +456,8 @@ class BotBuilder:
         return MaxBot(
             self._create_dialog_manager(),
             channels,
-            self.user_locks,
-            self._state_store,
+            self._user_locks,
+            self._persistence_manager,
             self.resources,
+            self._history_tracked,
         )

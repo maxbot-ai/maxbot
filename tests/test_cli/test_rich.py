@@ -12,23 +12,29 @@ from maxbot.context import (
     TurnContext,
 )
 from maxbot.errors import BotError, YamlSnippet
+from maxbot.flows.slot_filling import SlotFilling, SlotSchema
 from maxbot.maxml import fields, markup
 from maxbot.schemas import CommandSchema, ResourceSchema
 
 
 @pytest.fixture
+def console_journal_q():
+    return _create_console_journal(verbosity=-1)
+
+
+@pytest.fixture
 def console_journal():
-    return _create_console_journal(verbose=0)
+    return _create_console_journal(verbosity=0)
 
 
 @pytest.fixture
 def console_journal_v():
-    return _create_console_journal(verbose=1)
+    return _create_console_journal(verbosity=1)
 
 
 @pytest.fixture
 def console_journal_vv():
-    return _create_console_journal(verbose=2)
+    return _create_console_journal(verbosity=2)
 
 
 @pytest.fixture
@@ -51,7 +57,7 @@ def test_console_basic(ctx, console_journal):
     assert "Good day to you!" in out, out
 
 
-def test_console_commands_yaml(ctx, console_journal):
+def test_console_commands_xml(ctx, console_journal):
     ctx.commands.append({"text": markup.Value([markup.Item(markup.TEXT, "Hello, John!")])})
     ctx.commands.append(
         {
@@ -69,21 +75,23 @@ def test_console_commands_yaml(ctx, console_journal):
 
 
 def test_console_empty_journal_events(ctx, console_journal):
-    out = console_journal(ctx)
-    assert "journal_events" not in out
-    assert "logs" not in out
+    _test_console_empty_journal(ctx, console_journal)
 
 
 def test_console_empty_journal_events_v(ctx, console_journal_v):
-    out = console_journal_v(ctx)
-    assert "journal_events" not in out
-    assert "logs" not in out
+    _test_console_empty_journal(ctx, console_journal_v)
 
 
 def test_console_empty_journal_events_vv(ctx, console_journal_vv):
-    out = console_journal_vv(ctx)
+    _test_console_empty_journal(ctx, console_journal_vv)
+
+
+def _test_console_empty_journal(ctx, console_journal_):
+    out = console_journal_(ctx)
     assert "journal_events" not in out
     assert "logs" not in out
+    assert "user" not in out
+    assert "slots" not in out
 
 
 def test_console_logs(ctx, console_journal):
@@ -244,9 +252,136 @@ def test_console_journal_events_not_serializable(ctx, console_journal_vv):
     assert f"test {value!r}" in out, out
 
 
-def _create_console_journal(verbose):
+def test_console_journal_events_alias(ctx, console_journal_vv):
+    d = {"key1": "value1", "key2": "value2", "key3": "value3", "key4": "value4"}
+    ctx.journal_event("test", {"d1": d, "d2": d})
+
+    out = console_journal_vv(ctx)
+    assert "test d1: &" in out, out
+    assert "     d2: *" in out, out
+
+
+def test_console_journal_q_empty(console_journal_q):
+    ctx = TurnContext(
+        dialog={"channel_name": "test", "user_id": "321"},
+        message={"text": "hello world"},
+        intents=IntentsResult.resolve([RecognizedIntent("i1", 1)]),
+        entities=EntitiesResult.resolve([RecognizedEntity("e1", 1, "one", 2, 34)]),
+    )
+    ctx.commands.append({"text": markup.Value([markup.Item(markup.TEXT, "Hello, John!")])})
+    ctx.journal_event("event1", {"data": 1})
+    ctx.debug(("what is here?", {"xxx": "yyy"}))
+    ctx.warning("something wrong")
+
+    assert console_journal_q(ctx) == ""
+
+
+def test_console_journal_q_error(console_journal_q):
+    ctx = TurnContext(
+        dialog={"channel_name": "test", "user_id": "321"},
+        message={"text": "hello world"},
+        intents=IntentsResult.resolve([RecognizedIntent("i1", 1)]),
+        entities=EntitiesResult.resolve([RecognizedEntity("e1", 1, "one", 2, 34)]),
+    )
+    ctx.commands.append({"text": markup.Value([markup.Item(markup.TEXT, "Hello, John!")])})
+    ctx.journal_event("event1", {"data": 1})
+    ctx.debug(("what is here?", {"xxx": "yyy"}))
+    ctx.warning("something wrong")
+    ctx.set_error(BotError("some error"))
+
+    assert console_journal_q(ctx).strip() == "✗  some error"
+
+
+@pytest.mark.parametrize(
+    "state_field",
+    (
+        "user",
+        "slots",
+    ),
+)
+def test_console_journal_diff(ctx, console_journal_v, state_field):
+    getattr(ctx.state, state_field)["test"] = 1
+    del getattr(ctx.state, state_field)["test"]
+
+    out = [s.strip().split() for s in console_journal_v(ctx).splitlines()]
+    assert ["journal_events"] in out, out
+    assert [f"{state_field}.test", "=", "1"] in out, out
+    assert ["❌", "delete", f"{state_field}.test"] in out, out
+
+
+def test_console_journal_diff_clear(ctx, console_journal_v):
+    ctx.state.slots["test1"] = 1
+    ctx.state.slots["test2"] = 1
+    ctx.clear_state_variables()
+
+    out = [s.strip().split() for s in console_journal_v(ctx).splitlines()]
+    assert ["journal_events"] in out, out
+    assert ["❌", "delete", "slots.test1"] in out, out
+    assert ["❌", "delete", "slots.test2"] in out, out
+
+
+def test_console_journal_diff_clear_empty(ctx, console_journal_v):
+    ctx.clear_state_variables()
+
+    out = console_journal_v(ctx)
+    assert f"journal_events" not in out, out
+
+
+@pytest.mark.parametrize(
+    "state_field",
+    (
+        "user",
+        "slots",
+    ),
+)
+def test_console_journal_full(ctx, console_journal_vv, state_field):
+    getattr(ctx.state, state_field)["test"] = 1
+
+    out = console_journal_vv(ctx)
+    assert f"{state_field}\n" in out, out
+    assert ".test 1" in out, out
+
+
+@pytest.mark.parametrize(
+    "state_field",
+    (
+        "user",
+        "slots",
+    ),
+)
+def test_console_journal_full_if_error(ctx, console_journal_v, state_field):
+    getattr(ctx.state, state_field)["test"] = 1
+    ctx.set_error(BotError("some error"))
+
+    out = console_journal_v(ctx)
+    assert f"{state_field}\n" in out, out
+    assert ".test 1" in out, out
+
+
+async def test_jourtnal_slot_filling(ctx, console_journal_vv):
+    model = SlotFilling(
+        SlotSchema(many=True).loads(
+            """
+            - name: slot1
+              check_for: true
+              found: "<prompt_again />" """
+        ),
+        [],
+    )
+    await model(ctx, ctx.state.components.setdefault("xxx", {}))
+
+    out = console_journal_vv(ctx)
+    assert "journal_events\n" in out, out
+    assert "slot_filling  slot: slot1", out
+    assert "slots.slot1 = True", out
+    assert "found         slot: slot1", out
+    assert "                 control_command: prompt_again", out
+    assert "❌ delete     slots.slot1", out
+
+
+def _create_console_journal(verbosity):
     console = Console(force_terminal=False, soft_wrap=True)
-    journal = PrettyJournal(verbose=verbose, console=console)
+    journal = PrettyJournal(verbosity=verbosity, console=console)
 
     def call(ctx):
         with console.capture() as capture:

@@ -164,7 +164,7 @@ async def test_sanic_endpoint(bot):
     callback = AsyncMock()
 
     app = Sanic(__name__)
-    app.blueprint(bot.channels.facebook.blueprint(callback))
+    app.blueprint(bot.channels.facebook.blueprint(callback, None))
     _, response = await app.asgi_client.post(
         "/facebook",
         json=UPDATE_TEXT,
@@ -189,8 +189,59 @@ async def test_sanic_endpoint(bot):
 
 
 async def test_sanic_register_webhook(bot, caplog):
+    async def execute_once(app, fn):
+        await fn()
+
     with caplog.at_level(logging.WARNING):
-        bot.channels.facebook.blueprint(AsyncMock(), public_url="https://example.com/")
+        bot.channels.facebook.blueprint(
+            AsyncMock(), execute_once, public_url="https://example.com/"
+        )
     assert (
         "The facebook platform has no suitable api, register a webhook yourself https://example.com/facebook."
     ) in caplog.text
+
+
+async def test_timeout_not_specified(bot, dialog, respx_mock):
+    respx_mock.post(f"{API_URL}/me/messages?access_token={ACCESS_TOKEN}").respond(json={})
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.facebook.call_senders({"text": text}, dialog)
+    assert [c.request.extensions["timeout"] for c in respx_mock.calls] == [
+        {"connect": 5.0, "pool": 5.0, "read": 5.0, "write": 5.0},
+    ]
+
+
+async def test_timeout(dialog, respx_mock):
+    bot = MaxBot.inline(
+        f"""
+        channels:
+            facebook:
+                app_secret: {FB_APP_SECRET}
+                access_token: {ACCESS_TOKEN}
+                timeout:
+                  default: 3.1
+                  connect: 10
+    """
+    )
+    respx_mock.post(f"{API_URL}/me/messages?access_token={ACCESS_TOKEN}").respond(json={})
+    text = Mock()
+    text.render = Mock(return_value=MESSAGE_TEXT)
+    await bot.channels.facebook.call_senders({"text": text}, dialog)
+    assert [c.request.extensions["timeout"] for c in respx_mock.calls] == [
+        {"connect": 10, "pool": 3.1, "read": 3.1, "write": 3.1},
+    ]
+
+
+def test_limits():
+    MaxBot.inline(
+        f"""
+        channels:
+            facebook:
+                app_secret: {FB_APP_SECRET}
+                access_token: {ACCESS_TOKEN}
+                limits:
+                  max_keepalive_connections: 1
+                  max_connections: 2
+                  keepalive_expiry: 3
+    """
+    )

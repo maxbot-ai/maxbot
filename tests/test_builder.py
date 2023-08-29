@@ -82,11 +82,15 @@ async def test_channel_unknown(builder):
     )
 
 
-def test_state_store(builder):
-    builder.state_store = sentinel.state_store
-    assert builder.state_store is sentinel.state_store
+def test_persistence_manager(builder):
+    builder.persistence_manager = sentinel.persistence_manager
+    assert builder.persistence_manager is sentinel.persistence_manager
     bot = builder.build()
-    assert bot.state_store is sentinel.state_store
+    assert bot.persistence_manager is sentinel.persistence_manager
+
+
+def test_persistence_manager_default(builder):
+    assert type(builder.persistence_manager).__name__ == "SQLAlchemyManager"
 
 
 def test_user_locks(builder):
@@ -96,6 +100,10 @@ def test_user_locks(builder):
     assert bot.user_locks is sentinel.user_locks
 
 
+def test_user_locks_default(builder):
+    assert type(builder.user_locks).__name__ == "AsyncioLocks"
+
+
 def test_nlu(builder):
     nlu = Mock()
     builder.nlu = nlu
@@ -103,6 +111,10 @@ def test_nlu(builder):
     bot = builder.build()
     assert bot.dialog_manager.nlu is nlu
     nlu.load_resources.assert_called_once()
+
+
+def test_nlu_default(builder):
+    assert type(builder.nlu).__name__ == "Nlu"
 
 
 def test_jinja_options(builder):
@@ -274,3 +286,12 @@ def test_use_package_resources(builder, tmp_path, monkeypatch):
     bot = builder.build()
     commands = bot.process_message("hey bot")
     assert commands == [{"text": "hello world"}]
+
+
+def test_history_tracked(builder):
+    builder.track_history()
+    assert builder.build()._history_tracked == True
+
+
+def test_history_tracked_default(builder):
+    assert builder.build()._history_tracked == False

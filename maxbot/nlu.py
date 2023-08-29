@@ -373,14 +373,17 @@ class DateParserEntities:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
-            search_dates_settings = {"PREFER_DATES_FROM": "future"}
-            if utc_time:
-                search_dates_settings["RELATIVE_BASE"] = utc_time
-
             shift = 0
-            results = search_dates(doc.text, languages=["en"], settings=search_dates_settings)
+            settings = {"PREFER_DATES_FROM": "future", "STRICT_PARSING": True}
+            if utc_time:
+                settings["RELATIVE_BASE"] = utc_time
+
+            results = search_dates(doc.text, languages=["en"], settings=settings)
             if results is None:
-                return
+                del settings["STRICT_PARSING"]
+                results = search_dates(doc.text, languages=["en"], settings=settings)
+                if results is None:
+                    return
             for literal, dt in results:
                 start_char = doc.text.index(literal, shift)
                 end_char = start_char + len(literal)
@@ -389,15 +392,17 @@ class DateParserEntities:
                 dd = self.ddp.get_date_data(literal)
                 if dd.period == "time":
                     if parse(literal, languages=["en"], settings={"REQUIRE_PARTS": ["day"]}):
+                        name = "date" if settings.get("STRICT_PARSING") else "latent_date"
                         yield RecognizedEntity(
-                            "date", dt.date().isoformat(), literal, start_char, end_char
+                            name, dt.date().isoformat(), literal, start_char, end_char
                         )
                     yield RecognizedEntity(
                         "time", dt.time().isoformat(), literal, start_char, end_char
                     )
                 else:
+                    name = "date" if settings.get("STRICT_PARSING") else "latent_date"
                     yield RecognizedEntity(
-                        "date", dt.date().isoformat(), literal, start_char, end_char
+                        name, dt.date().isoformat(), literal, start_char, end_char
                     )
 
 

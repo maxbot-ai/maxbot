@@ -21,7 +21,7 @@ Special variables related to the [digression](/design-guides/digressions.md) flo
 
 | Name         | Type                                    | Description |
 | -----------  | ----------- 	                           | ----------- |
-| `digressing` | [Boolean](/design-reference/booleans.md) | The variable is set to true during the digression. You can check it to [prevent digressions into](/design-guides/digressions.md#check-digressing) a particular root node. |
+| `digressing` | [Boolean](/design-reference/booleans.md) | The variable is set to true during the digression. You can check it to [prevent digressions](/design-guides/digressions.md#check-digressing) into a particular root node or execute some commands. |
 | `returning`  | [Boolean](/design-reference/booleans.md) | The variable is set to true when returning after digression. Use it to add [custom return message](/design-guides/digressions.md#custom-return-message) to node response. |
 
 The following special variables can help you check and set values in slots.

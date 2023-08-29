@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 
 import httpx
 
-from ..maxml import Schema, fields
+from ..maxml import PoolLimitSchema, Schema, TimeoutSchema, fields
 
 logger = logging.getLogger(__name__)
 
@@ -14,18 +14,18 @@ logger = logging.getLogger(__name__)
 class Gateway:
     """Facebook sender and verifier incoming messages."""
 
-    # Facebook graph api version with which this gateway is well tested.
-    # @See https://developers.facebook.com/docs/graph-api/guides/versioning
-    httpx_client = httpx.AsyncClient(base_url="https://graph.facebook.com/v15.0", timeout=3)
-
-    def __init__(self, app_secret, access_token):
+    def __init__(self, app_secret, access_token, **kwargs):
         """Create a new class instance.
 
         :param str app_secret: Facebook application secret
         :param str access_token: Facebook access_token
+        :param dict kwargs: Arguments for creating HTTPX asynchronous client.
         """
         self.app_secret = app_secret
         self.access_token = access_token
+        self.httpx_client = httpx.AsyncClient(
+            base_url="https://graph.facebook.com/v15.0", **kwargs
+        )
 
     async def send_request(self, json_data):
         """Send request to Facebook.
@@ -131,6 +131,12 @@ class FacebookChannel:
         # Facebook access_token
         # @See https://developers.facebook.com/docs/facebook-login/security/#appsecret
         access_token = fields.Str(required=True)
+        # Default HTTP request timeouts
+        # @See https://www.python-httpx.org/advanced/#timeout-configuration
+        timeout = fields.Nested(TimeoutSchema())
+        # Pool limit configuration
+        # @See https://www.python-httpx.org/advanced/#pool-limit-configuration
+        limits = fields.Nested(PoolLimitSchema())
 
     @cached_property
     def gateway(self):
@@ -138,7 +144,12 @@ class FacebookChannel:
 
         :return Gateway:
         """
-        return Gateway(self.config["app_secret"], self.config["access_token"])
+        return Gateway(
+            self.config["app_secret"],
+            self.config["access_token"],
+            timeout=self.config.get("timeout", TimeoutSchema.DEFAULT),
+            limits=self.config.get("limits", PoolLimitSchema.DEFAULT),
+        )
 
     @cached_property
     def _api(self):
@@ -210,10 +221,11 @@ class FacebookChannel:
                 return {"image": {"url": images[0]}}
         return None
 
-    def blueprint(self, callback, public_url=None, webhook_path=None):
+    def blueprint(self, callback, execute_once, public_url=None, webhook_path=None):
         """Create web application blueprint to receive incoming updates.
 
         :param callable callback: a callback for received messages.
+        :param callable execute_once: Execute only for first WEB application worker.
         :param string public_url: Base url to register webhook.
         :param string webhook_path: An url path to receive incoming updates.
         :return Blueprint: Blueprint for sanic app.
@@ -229,6 +241,7 @@ class FacebookChannel:
         @bp.post(webhook_path)
         async def webhook(request):
             # @See https://developers.facebook.com/docs/messenger-platform/webhooks#event-notifications
+            logger.debug("%s", request.json)
 
             http_code = self.gateway.verify_token(request.body, request.headers)
             if http_code != 200:

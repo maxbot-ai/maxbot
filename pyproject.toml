@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "Maxbot"
-version = "0.2.0"
+version = "0.3.0"
 description = "Maxbot is an open source library and framework for creating conversational apps."
 license = "MIT"
 authors = ["Maxbot team <hello@maxbot.ai>"]
@@ -104,3 +104,6 @@ asyncio_mode = "auto"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.plugins.pytest11]
+maxbot_stories = "maxbot.stories.pytest"

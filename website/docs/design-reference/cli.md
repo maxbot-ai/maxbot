@@ -41,16 +41,7 @@ Run the bot.
 | -q, --quiet                  | Do not log to console. |
 | --journal-file FILENAME      | Write the journal to the file |
 | --journal-output [json\|yaml] | Journal file format [default: json] |
+| --workers                    | Number of web application worker processes to spawn. |
+| --fast                       | Set the number of web application workers to max allowed. |
+| --single-process             | Run web application in a single process. |
 | --help                       | Show this message and exit. |
-
-## stories
-
-Run bot stories.
-You can use the stories mechanism to test the bot.
-This is a mechanism that verifies that the bot will react in the expected way to events known in advance from the user.
-
-| Name               | Description                    |
-| ------------------ | ------------------------------ |
-| -B, --bot TEXT     | Path for bot file or directory or the Maxbot instance to load. The instance can be in the form 'module:name'. Module can be a dotted import. Name is not required if it is 'bot'. [required]       |
-| -S, --stories FILE | Path to YAML file with stories |
-| --help             | Show this message and exit.    |
